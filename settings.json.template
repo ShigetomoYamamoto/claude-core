@@ -1,0 +1,83 @@
+{
+  "env": {
+    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
+  },
+  "permissions": {
+    "allow": [
+      "Bash(git commit *)",
+      "Bash(git branch *)"
+    ],
+    "defaultMode": "auto"
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 __HOME__/.claude/hooks/doc-blocker.py"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 __HOME__/.claude/hooks/console-log-warning.py"
+          },
+          {
+            "type": "command",
+            "command": "python3 __HOME__/.claude/hooks/secret-detection.py"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "afplay -v 0.2 /System/Library/Sounds/Glass.aiff"
+          },
+          {
+            "type": "command",
+            "command": "python3 __HOME__/.claude/hooks/console-log-audit.py"
+          }
+        ]
+      }
+    ],
+    "PermissionRequest": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "afplay -v 0.2 /System/Library/Sounds/Ping.aiff"
+          }
+        ]
+      }
+    ]
+  },
+  "enabledPlugins": {
+    "slack@claude-plugins-official": true,
+    "postman@claude-plugins-official": true,
+    "supabase@claude-plugins-official": true,
+    "vercel@claude-plugins-official": true
+  },
+  "extraKnownMarketplaces": {
+    "claude-code-plugins": {
+      "source": {
+        "source": "github",
+        "repo": "anthropics/claude-code"
+      }
+    }
+  },
+  "effortLevel": "high",
+  "remoteControlAtStartup": true,
+  "agentPushNotifEnabled": true,
+  "skipAutoPermissionPrompt": true,
+  "model": "opusplan"
+}

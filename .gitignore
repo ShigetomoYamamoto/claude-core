@@ -1,0 +1,10 @@
+# Auto-generated and machine-specific files
+*.pyc
+__pycache__/
+.DS_Store
+
+# Do not commit actual settings.json (generated from template)
+# settings.json
+
+# Machine-specific credentials
+.credentials.json
