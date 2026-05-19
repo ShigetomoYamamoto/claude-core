@@ -1,25 +1,25 @@
 ---
-description: Safely identify and remove dead code, unused dependencies, and duplicates. Invokes refactor-cleaner agent with analysis tools (knip, depcheck, ts-prune).
+description: デッドコード・未使用依存・重複を安全に検出・削除します。refactor-cleaner エージェントを knip/depcheck/ts-prune で起動します。
 ---
 
-# Refactor Clean
+# リファクタリング整理
 
-Invokes the **refactor-cleaner** agent to identify and safely remove dead code.
+**refactor-cleaner エージェント**を起動して、デッドコードを特定・削除します。
 
-## What This Command Does
+## このコマンドが行うこと
 
-- Runs knip, depcheck, ts-prune to detect unused code
-- Categorizes findings by risk: SAFE / CAUTION / DANGER
-- Removes only verifiably unused code
-- Runs tests after each removal batch
-- Documents all deletions
+- knip・depcheck・ts-prune を実行して未使用コードを検出する
+- 発見物をリスク別に分類する：SAFE / CAUTION / DANGER
+- 確実に未使用のコードのみを削除する
+- 削除のたびにテストを実行して確認する
+- 削除内容をすべて記録する
 
-## When to Use
+## いつ使うか
 
-- Codebase has accumulated unused exports or dependencies
-- Before a major refactor to reduce surface area
-- Periodic cleanup to keep the codebase lean
+- 未使用エクスポートや依存パッケージが蓄積してきたとき
+- 大きなリファクタリングの前に対象範囲を絞りたいとき
+- 定期的なコードベースの整理をするとき
 
-## Related Agents
+## 関連エージェント
 
-Invokes `refactor-cleaner` agent at `~/.claude/agents/refactor-cleaner.md`
+`~/.claude/agents/refactor-cleaner.md` を起動します。

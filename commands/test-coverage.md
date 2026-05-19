@@ -1,25 +1,25 @@
 ---
-description: Analyze test coverage and generate missing tests to reach 80%+ threshold. Invokes tdd-guide agent to identify and fill coverage gaps.
+description: テストカバレッジを分析して 80% 以上に達するための不足テストを生成します。tdd-guide エージェントを起動してカバレッジのギャップを特定・補完します。
 ---
 
-# Test Coverage
+# テストカバレッジ補完
 
-Invokes the **tdd-guide** agent to analyze coverage and generate missing tests.
+**tdd-guide エージェント**を起動して、カバレッジを分析し不足しているテストを生成します。
 
-## What This Command Does
+## このコマンドが行うこと
 
-- Runs tests with coverage: `npm test --coverage`
-- Identifies files below 80% threshold
-- Generates unit, integration, or E2E tests for uncovered paths
-- Verifies new tests pass
-- Reports before/after coverage metrics
+- `npm test --coverage` でカバレッジを計測する
+- 80% を下回っているファイルを特定する
+- カバーされていないパスに対してユニット・統合・E2E テストを生成する
+- 新しいテストがパスすることを確認する
+- 補完前後のカバレッジ数値を報告する
 
-## When to Use
+## いつ使うか
 
-- Coverage has dropped below 80%
-- After adding new features without tests
-- Before a release to verify coverage targets
+- カバレッジが 80% を下回ったとき
+- テストなしで新機能を追加した後
+- リリース前にカバレッジ目標を確認するとき
 
-## Related Agents
+## 関連エージェント
 
-Invokes `tdd-guide` agent at `~/.claude/agents/tdd-guide.md`
+`~/.claude/agents/tdd-guide.md` を起動します。

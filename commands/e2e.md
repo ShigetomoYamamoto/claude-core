@@ -1,31 +1,30 @@
 ---
-description: Generate and run end-to-end tests with Playwright. Invokes e2e-runner agent to discover project-specific scenarios, create test journeys, run tests, and capture artifacts.
+description: Playwright で E2E テストを生成・実行します。e2e-runner エージェントを起動してシナリオ発見・テスト作成・実行・アーティファクト保存を行います。
 ---
 
-# E2E Command
+# E2E テスト
 
-Invokes the **e2e-runner** agent to generate, maintain, and execute end-to-end tests.
+**e2e-runner エージェント**を起動して、E2E テストの生成・管理・実行を行います。
 
-## What This Command Does
+## このコマンドが行うこと
 
-1. **Scenario Discovery** - Reads `.claude/e2e-scenarios.md` for project-specific critical flows. Generates the file by scanning the project if it does not exist.
-2. **Test Generation** - Creates Playwright tests using Page Object Model pattern
-3. **Test Execution** - Runs tests across browsers
-4. **Artifact Capture** - Screenshots, videos, traces on failures
-5. **Flaky Test Management** - Identifies and quarantines unstable tests
+1. **シナリオ発見** — `.claude/e2e-scenarios.md` からプロジェクト固有の重要フローを読み込む。ファイルがない場合はプロジェクトをスキャンして自動生成する
+2. **テスト生成** — Page Object Model パターンで Playwright テストを作成する
+3. **テスト実行** — 複数ブラウザでテストを実行する
+4. **アーティファクト保存** — 失敗時にスクリーンショット・動画・トレースを保存する
+5. **不安定テスト管理** — 不安定なテストを検出して隔離する
 
-## When to Use
+## いつ使うか
 
-- Before merging a PR to verify critical flows
-- After implementing a new user-facing feature
-- Setting up an E2E test suite for a project for the first time
+- PR マージ前に重要フローを確認するとき
+- ユーザー向け新機能を実装した後
+- プロジェクトに E2E テストスイートを初めて導入するとき
 
-## Project-Specific Scenarios
+## プロジェクト固有のシナリオ
 
-Project-specific test scenarios are stored in `.claude/e2e-scenarios.md` at the repo root.
-The e2e-runner agent generates this file automatically on first run by scanning routes,
-components, and API endpoints. Edit the file to refine priorities.
+テストシナリオはリポジトリルートの `.claude/e2e-scenarios.md` に保存されます。
+初回実行時に e2e-runner エージェントがルート・コンポーネント・API エンドポイントをスキャンして自動生成します。ファイルを編集して優先度を調整できます。
 
-## Related Agents
+## 関連エージェント
 
-Invokes `e2e-runner` agent at `~/.claude/agents/e2e-runner.md`
+`~/.claude/agents/e2e-runner.md` を起動します。

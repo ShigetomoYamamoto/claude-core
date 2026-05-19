@@ -1,39 +1,39 @@
 ---
-description: Enforce test-driven development workflow. Scaffold interfaces, generate tests FIRST, then implement minimal code to pass. Ensure 80%+ coverage.
+description: テスト駆動開発を強制します。インターフェースの骨格作成→テストを先に書く→最小限の実装でパスさせる。80%以上のカバレッジを確保します。
 ---
 
-# TDD Command
+# TDD 実装
 
-Invokes the **tdd-guide** agent to enforce test-driven development methodology.
+**tdd-guide エージェント**を起動して、テスト駆動開発を徹底します。
 
-## What This Command Does
+## このコマンドが行うこと
 
-1. **Scaffold Interfaces** - Define types/interfaces first
-2. **Generate Tests First** - Write failing tests (RED)
-3. **Implement Minimal Code** - Write just enough to pass (GREEN)
-4. **Refactor** - Improve code while keeping tests green (REFACTOR)
-5. **Verify Coverage** - Ensure 80%+ test coverage
+1. **インターフェース定義** — 型・インターフェースを先に定義する
+2. **テストを先に書く** — 失敗するテストを作成する（RED）
+3. **最小限の実装** — テストをパスさせるだけのコードを書く（GREEN）
+4. **リファクタリング** — テストを維持しながらコードを改善する（REFACTOR）
+5. **カバレッジ確認** — 80% 以上を確保する
 
-## TDD Cycle
+## TDD サイクル
 
 ```
-RED → GREEN → REFACTOR → REPEAT
+RED → GREEN → REFACTOR → 繰り返す
 ```
 
-**Mandatory**: Tests must be written BEFORE implementation. Never skip the RED phase.
+⚠️ **必須**: テストは実装より先に書くこと。RED フェーズを飛ばしてはいけない。
 
-## When to Use
+## いつ使うか
 
-- Implementing new features
-- Fixing bugs (write a test that reproduces the bug first)
-- Refactoring existing code
-- Building critical business logic
+- 新機能を実装するとき
+- バグを修正するとき（まずバグを再現するテストを書く）
+- 既存コードをリファクタリングするとき
+- 重要なビジネスロジックを構築するとき
 
-## Coverage Requirements
+## カバレッジ要件
 
-- 80% minimum for all code
-- 100% required for financial calculations, auth logic, security-critical code
+- 全コードで最低 80%
+- 金融計算・認証ロジック・セキュリティ重要コードは 100% 必須
 
-## Related Agents
+## 関連エージェント
 
-Invokes `tdd-guide` agent at `~/.claude/agents/tdd-guide.md`
+`~/.claude/agents/tdd-guide.md` を起動します。

@@ -1,24 +1,24 @@
 ---
-description: Comprehensive security and quality review of uncommitted changes. Invokes code-reviewer agent to check for vulnerabilities, code quality issues, and best practice violations.
+description: 未コミットの変更をセキュリティ・品質の観点でレビューします。code-reviewer エージェントを起動して脆弱性・コード品質問題・ベストプラクティス違反を検出します。
 ---
 
-# Code Review
+# コードレビュー
 
-Invokes the **code-reviewer** agent to review all uncommitted changes.
+**code-reviewer エージェント**を起動して、未コミットの変更をレビューします。
 
-## What This Command Does
+## このコマンドが行うこと
 
-- Gets changed files via `git diff --name-only HEAD`
-- Checks for security issues (hardcoded secrets, SQL injection, XSS)
-- Reviews code quality (large functions, deep nesting, missing error handling)
-- Reports findings by priority: CRITICAL / HIGH / MEDIUM
+- `git diff --name-only HEAD` で変更ファイルを取得する
+- セキュリティ問題を確認する（ハードコードシークレット・SQLインジェクション・XSS など）
+- コード品質を確認する（大きすぎる関数・深いネスト・エラーハンドリング漏れ など）
+- 指摘を優先度別に報告する：CRITICAL / HIGH / MEDIUM
 
-## When to Use
+## いつ使うか
 
-- Before committing or opening a PR
-- After implementing a new feature
-- When explicit review is needed beyond auto-invocation
+- コミットや PR 作成の前
+- 新機能の実装後
+- 自動起動とは別に明示的にレビューしたいとき
 
-## Related Agents
+## 関連エージェント
 
-Invokes `code-reviewer` agent at `~/.claude/agents/code-reviewer.md`
+`~/.claude/agents/code-reviewer.md` を起動します。

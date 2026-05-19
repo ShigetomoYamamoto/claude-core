@@ -1,26 +1,26 @@
 ---
-description: Fix TypeScript and build errors incrementally. Invokes build-error-resolver agent for minimal-diff fixes without architectural changes.
+description: TypeScript・ビルドエラーを段階的に修正します。build-error-resolver エージェントを起動して最小限の変更で修正します。
 ---
 
-# Build Fix
+# ビルドエラー修正
 
-Invokes the **build-error-resolver** agent to fix TypeScript, compilation, and build errors.
+**build-error-resolver エージェント**を起動して、TypeScript・コンパイル・ビルドエラーを修正します。
 
-## What This Command Does
+## このコマンドが行うこと
 
-- Runs `tsc --noEmit` or `npm run build` to collect all errors
-- Fixes errors one at a time with minimal diffs
-- Re-runs build after each fix to verify
-- Stops if a fix introduces new errors or same error persists after 3 attempts
-- Reports errors fixed / remaining
+- `tsc --noEmit` または `npm run build` を実行してエラーを収集する
+- 最小限の差分で1件ずつ修正する
+- 修正のたびにビルドを再実行して確認する
+- 修正後に新たなエラーが発生した場合、または同じエラーが3回続いた場合は停止する
+- 修正済み件数と残件数を報告する
 
-## When to Use
+## いつ使うか
 
-- `npm run build` fails
-- `npx tsc --noEmit` shows type errors
-- Import/module resolution errors
-- Dependency version conflicts
+- `npm run build` が失敗するとき
+- `npx tsc --noEmit` で型エラーが出るとき
+- インポート・モジュール解決エラーが出るとき
+- 依存パッケージのバージョン競合が発生しているとき
 
-## Related Agents
+## 関連エージェント
 
-Invokes `build-error-resolver` agent at `~/.claude/agents/build-error-resolver.md`
+`~/.claude/agents/build-error-resolver.md` を起動します。

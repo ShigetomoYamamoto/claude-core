@@ -1,24 +1,24 @@
 ---
-description: Analyze codebase structure and update architecture codemaps in docs/CODEMAPS/. Invokes doc-updater agent.
+description: コードベースの構造を分析して docs/CODEMAPS/ のアーキテクチャコードマップを更新します。doc-updater エージェントを起動します。
 ---
 
-# Update Codemaps
+# コードマップ更新
 
-Invokes the **doc-updater** agent to regenerate architecture codemaps.
+**doc-updater エージェント**を起動して、アーキテクチャコードマップを再生成します。
 
-## What This Command Does
+## このコマンドが行うこと
 
-- Scans source files for imports, exports, and dependencies
-- Generates or updates `docs/CODEMAPS/` (frontend, backend, database, integrations)
-- Adds freshness timestamps
-- Requests approval if changes exceed 30% diff from previous version
+- ソースファイルのインポート・エクスポート・依存関係をスキャンする
+- `docs/CODEMAPS/`（フロントエンド・バックエンド・データベース・インテグレーション）を生成・更新する
+- 更新日時のタイムスタンプを付与する
+- 前回バージョンから 30% 以上の差分がある場合は承認を求める
 
-## When to Use
+## いつ使うか
 
-- After adding major new modules or restructuring directories
-- Before onboarding new team members
-- Periodically to keep architecture docs in sync with reality
+- 大きな新モジュールの追加やディレクトリ構成の変更後
+- 新しいメンバーのオンボーディング前
+- アーキテクチャドキュメントを最新の状態に保つための定期メンテナンス
 
-## Related Agents
+## 関連エージェント
 
-Invokes `doc-updater` agent at `~/.claude/agents/doc-updater.md`
+`~/.claude/agents/doc-updater.md` を起動します。

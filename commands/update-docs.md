@@ -1,24 +1,24 @@
 ---
-description: Sync documentation from source-of-truth (package.json, .env.example). Invokes doc-updater agent to update READMEs and guides.
+description: package.json・.env.example を正とするドキュメントを同期します。doc-updater エージェントを起動して README・ガイドを更新します。
 ---
 
-# Update Docs
+# ドキュメント更新
 
-Invokes the **doc-updater** agent to refresh documentation from code.
+**doc-updater エージェント**を起動して、コードからドキュメントを最新化します。
 
-## What This Command Does
+## このコマンドが行うこと
 
-- Reads `package.json` scripts and generates reference tables
-- Reads `.env.example` and documents all environment variables
-- Updates `docs/CONTRIB.md` and `docs/RUNBOOK.md`
-- Flags documentation not modified in 90+ days for review
+- `package.json` のスクリプトを読み込んでリファレンス表を生成する
+- `.env.example` を読み込んで環境変数をドキュメント化する
+- `docs/CONTRIB.md` と `docs/RUNBOOK.md` を更新する
+- 90日以上更新されていないドキュメントをレビュー対象としてフラグを立てる
 
-## When to Use
+## いつ使うか
 
-- After adding new npm scripts or environment variables
-- When setup instructions become outdated
-- Before releasing a new version
+- npm スクリプトや環境変数を追加した後
+- セットアップ手順が古くなってきたとき
+- 新バージョンのリリース前
 
-## Related Agents
+## 関連エージェント
 
-Invokes `doc-updater` agent at `~/.claude/agents/doc-updater.md`
+`~/.claude/agents/doc-updater.md` を起動します。
