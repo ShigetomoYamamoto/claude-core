@@ -1,21 +1,5 @@
 # Agent Orchestration
 
-## Available Agents
-
-Located in `~/.claude/agents/`:
-
-| Agent | Purpose | When to Use |
-|-------|---------|-------------|
-| architect | Requirements definition, system design | New project, new feature needing DB/API design, major design decisions |
-| planner | Implementation planning | Feature implementation within an existing design |
-| tdd-guide | Test-driven development | New features, bug fixes |
-| code-reviewer | Code review | After writing code |
-| security-reviewer | Security analysis | Auth, user input, API endpoints, secrets |
-| build-error-resolver | Fix build errors | When build fails |
-| e2e-runner | E2E testing | Critical user flows |
-| refactor-cleaner | Dead code cleanup | Code maintenance |
-| doc-updater | Documentation | Updating docs |
-
 ## Proactive Agent Invocation
 
 These agents MUST be invoked automatically — without waiting for the user to ask:
