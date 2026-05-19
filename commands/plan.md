@@ -15,14 +15,23 @@ This command invokes the **planner** agent to create a comprehensive implementat
 
 ## When to Use
 
-Use `/plan` when:
-- Starting a new feature
-- Making significant architectural changes
-- Working on complex refactoring
-- Multiple files/components will be affected
-- Requirements are unclear or ambiguous
+Use `/plan` when implementing a feature within an **existing, defined design**.
+
+If the feature requires new DB schema design, API contract definition, or tech stack decisions, use `/design` first to define the architecture, then use `/plan` for the implementation steps.
 
 ## How It Works
+
+まず以下を判断する：
+
+**設計フェーズが必要か？**（以下に1つでも当てはまる場合）
+- 新規DBスキーマの作成・変更が必要
+- 新しいAPIエンドポイントの設計が必要
+- 技術スタックの選定・変更が必要
+- システムの境界やデータフローが変わる
+
+→ **YES** の場合：`/design` を先に実行するようユーザーに案内して停止する。設計が完了してから `/plan` を呼び直す。
+
+→ **NO** の場合：planner エージェントを起動して以下を実行する。
 
 The planner agent will:
 

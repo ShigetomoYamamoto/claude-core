@@ -36,7 +36,21 @@ git diff develop...HEAD
 - 影響範囲（どのシステム・機能に関わるか）
 - 注目すべき実装の変更点
 
-## ステップ 3: リモートへのプッシュ（未プッシュの場合）
+## ステップ 3: コードレビュー
+
+**code-reviewer エージェント**を起動して `git diff develop...HEAD` の全差分をレビューする。
+
+- CRITICAL / HIGH の指摘があれば **PR作成を中断し、先に修正してコミットする**
+- MEDIUM 以下の指摘はユーザーに提示した上で続行してよい
+
+差分に以下のいずれかが含まれる場合は **security-reviewer エージェント**も追加で起動する：
+- 認証・セッション・トークン処理
+- ユーザー入力のバリデーション・サニタイズ
+- API エンドポイントの追加・変更
+- シークレット・環境変数の参照
+- 決済・課金・個人情報の処理
+
+## ステップ 5: リモートへのプッシュ（未プッシュの場合）
 
 現在のブランチがリモートに存在しない、または未プッシュのコミットがある場合：
 
@@ -44,7 +58,7 @@ git diff develop...HEAD
 git push -u origin <current-branch>
 ```
 
-## ステップ 4: PRタイトルとDescription の生成
+## ステップ 6: PRタイトルとDescription の生成
 
 Description テンプレート・Summary/Test plan の書き方は `~/.claude/skills/git-workflow/SKILL.md` を参照すること。
 
@@ -54,11 +68,11 @@ Description テンプレート・Summary/Test plan の書き方は `~/.claude/sk
 - `type: 内容` 形式（Conventional Commits に準拠）
 - 日本語で記述
 
-## ステップ 5: PR作成前の確認
+## ステップ 7: PR作成前の確認
 
 生成したタイトルと Description をユーザーに提示して承認を得る。
 
-## ステップ 6: PR作成実行
+## ステップ 8: PR作成実行
 
 ```bash
 gh pr create \
@@ -70,7 +84,7 @@ EOF
 )"
 ```
 
-## ステップ 7: 完了報告
+## ステップ 9: 完了報告
 
 PR作成後、以下を表示する：
 
