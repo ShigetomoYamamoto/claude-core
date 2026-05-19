@@ -29,5 +29,31 @@ if [ -f "$DOTFILES_DIR/settings.json.template" ]; then
   echo "  generated settings.json"
 fi
 
+# Merge mcpServers into ~/.claude.json
+if [ -f "$DOTFILES_DIR/mcp.json" ]; then
+  python3 - "$DOTFILES_DIR/mcp.json" "$HOME/.claude.json" <<'PYEOF'
+import json, sys, os
+
+mcp_path = sys.argv[1]
+claude_path = sys.argv[2]
+
+with open(mcp_path) as f:
+    mcp = json.load(f)
+
+claude = {}
+if os.path.exists(claude_path):
+    with open(claude_path) as f:
+        claude = json.load(f)
+
+claude["mcpServers"] = mcp.get("mcpServers", {})
+
+with open(claude_path, "w") as f:
+    json.dump(claude, f, indent=2)
+    f.write("\n")
+
+print("  merged mcpServers into ~/.claude.json")
+PYEOF
+fi
+
 echo ""
 echo "Done. Claude Code config installed to $CLAUDE_DIR"
