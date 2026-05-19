@@ -35,6 +35,43 @@ Claude Code のグローバル設定を管理する dotfiles リポジトリ。
 
 ## 新しいマシンへのインストール
 
+### 前提条件
+
+このリポジトリは **Docker 必須** の構成です。GitHub MCP を Docker コンテナで起動することで、PAT を平文設定ファイル（`~/.claude.json` 等）に書き残さない設計にしています。
+
+| 用途 | 必要なもの |
+|---|---|
+| GitHub MCP | **Docker（起動済み）** + 環境変数 `GITHUB_PERSONAL_ACCESS_TOKEN` |
+| Playwright MCP | Node.js / npx |
+| Figma MCP | Figma Desktop アプリ（起動済み） |
+
+#### Docker のインストール
+
+```bash
+# macOS
+brew install --cask docker
+open -a Docker  # Docker Desktop を起動
+
+# Linux
+# 公式ドキュメント参照: https://docs.docker.com/engine/install/
+```
+
+#### GitHub Personal Access Token の設定
+
+シェル設定ファイル（`~/.zshrc` 等）に追記：
+
+```bash
+export GITHUB_PERSONAL_ACCESS_TOKEN=ghp_xxxxxxxxxxxx
+```
+
+セキュリティ上の推奨：
+
+- **Fine-grained PAT** を使い、必要なリポジトリ・スコープのみに限定する
+- **有効期限を 30〜90 日** に設定して定期的にローテーションする
+- 1Password CLI など秘密管理ツールを併用する場合は `export GITHUB_PERSONAL_ACCESS_TOKEN=$(op read "op://...")` のように動的に取得する
+
+### インストール
+
 ```bash
 git clone https://github.com/ShigetomoYamamoto/claude-config.git ~/dotfiles/claude-config
 cd ~/dotfiles/claude-config
