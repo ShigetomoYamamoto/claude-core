@@ -23,7 +23,7 @@ Claude Code のグローバル設定を管理する dotfiles リポジトリ。
 | `commands/` | スラッシュコマンド（/init-autonomous, /plan, /tdd, /commit, /create-pr など） |
 | `hooks/` | 品質ガードフック（console.log 警告・シークレット検出・セッション終了監査） |
 | `rules/` | コーディングスタイル、テスト要件、セキュリティ、エージェント運用ガイドライン |
-| `skills/` | 参照ドキュメント（フロントエンド/バックエンドパターンなど） |
+| `skills/` | 参照ドキュメント（フロントエンド/バックエンドパターン、git-workflow など） |
 | `settings.json.template` | Claude Code 設定テンプレート（インストール時にパス自動解決） |
 
 ## settings.json.template の主な設定
@@ -61,18 +61,6 @@ cd ~/dotfiles/claude-config
 - `.github/` — CI/CD・PRテンプレート・Issue テンプレート
 
 生成後は `docs/01_product-specifications.md` と `docs/02_detailed-design.md` を記入することで、エージェントが Issue 番号から PR 作成まで全自動で動く状態になります。
-
-## このマシンで設定を変更したとき
-
-`~/.claude/` 内のファイルを編集した後、以下を実行してリポジトリに反映します：
-
-```bash
-cd ~/dotfiles/claude-config
-./sync.sh
-git add .
-git commit -m "..."
-git push
-```
 
 ## 別マシンで最新の設定を取得するとき
 

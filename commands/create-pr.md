@@ -46,39 +46,13 @@ git push -u origin <current-branch>
 
 ## ステップ 4: PRタイトルとDescription の生成
 
+Description テンプレート・Summary/Test plan の書き方は `~/.claude/skills/git-workflow/SKILL.md` を参照すること。
+
 ### タイトルのルール
 
 - 70文字以内
 - `type: 内容` 形式（Conventional Commits に準拠）
 - 日本語で記述
-
-### Description テンプレート
-
-```markdown
-## Summary
-- <変更点1>
-- <変更点2>
-- <変更点3（必要に応じて）>
-
-## Test plan
-- [ ] <確認項目1>
-- [ ] <確認項目2>
-- [ ] <確認項目3（必要に応じて）>
-
-🤖 Generated with [Claude Code](https://claude.com/claude-code)
-```
-
-### Summary の書き方
-
-- コミット履歴と差分から変更内容を箇条書きで3点程度にまとめる
-- 「何を」「なぜ」変えたかを端的に記述する
-- 技術的な詳細よりもレビュアーが理解しやすい説明を優先する
-
-### Test plan の書き方
-
-- 変更した機能・修正したバグに対して手動確認すべき項目を列挙する
-- ゲーム・UI変更の場合は具体的な操作手順を記載する
-- 「〜が正しく動作することを確認」という形式で記述する
 
 ## ステップ 5: PR作成前の確認
 

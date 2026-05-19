@@ -14,8 +14,8 @@ if os.path.exists(path):
 basename = os.path.basename(path)
 parts = path.replace('\\', '/').split('/')
 
-ALLOWED_NAMES = {'CLAUDE.md', 'ONBOARDING.md', 'CHANGELOG.md', 'MEMORY.md'}
-ALLOWED_DIRS  = {'.claude', 'docs', '.github', 'memory'}
+ALLOWED_NAMES = {'CLAUDE.md', 'ONBOARDING.md', 'CHANGELOG.md', 'MEMORY.md', 'SKILL.md'}
+ALLOWED_DIRS  = {'.claude', 'docs', '.github', 'memory', 'skills', 'commands', 'agents', 'rules'}
 
 if basename in ALLOWED_NAMES:
     sys.exit(0)
