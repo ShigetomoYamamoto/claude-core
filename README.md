@@ -19,25 +19,27 @@ Claude Code のグローバル設定を管理する dotfiles リポジトリ。
 
 | ディレクトリ/ファイル | 内容 |
 |---|---|
-| `agents/` | 9体のカスタムエージェント（planner, tdd-guide, code-reviewer, security-reviewer など） |
-| `commands/` | スラッシュコマンド（/design, /plan, /tdd, /commit, /create-pr, /init-autonomous など） |
+| `agents/` | 9体のカスタムエージェント（architect, planner, tdd-guide, code-reviewer, security-reviewer など） |
+| `commands/` | 15個のスラッシュコマンド（/design, /plan, /tdd, /commit, /create-pr, /init-autonomous など） |
 | `hooks/` | 品質ガードフック（console.log 警告・シークレット検出・セッション終了監査） |
 | `rules/` | コーディングスタイル、テスト要件、セキュリティ、エージェント運用ガイドライン |
-| `skills/` | 参照ドキュメント（フロントエンド/バックエンドパターン、git-workflow など） |
-| `settings.json.template` | Claude Code 設定テンプレート（インストール時にパス自動解決） |
+| `skills/` | 参照スキル（git-workflow, tdd-workflow, security-review） |
+| `settings.json.template` | Claude Code 設定テンプレート（パス自動解決・プラグイン有効化設定を含む） |
+| `mcp.json` | MCP サーバー設定（GitHub / Playwright / Figma） |
 
 ## settings.json.template の主な設定
 
 - `defaultMode: auto` — ほとんどの操作を自動承認
 - `Bash(git *)` / `Bash(gh *)` — どのプロジェクトでも git/gh 操作が確認なしで動作
 - `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS: 1` — 複数エージェントの並列実行を有効化
+- `enabledPlugins` — Slack / Postman / Supabase / Vercel プラグインを自動有効化
 - フック: Stop 時に音声通知（macOS: afplay / Linux: terminal bell）+ console.log 監査
 
 ## 新しいマシンへのインストール
 
 ### 前提条件
 
-このリポジトリは **Docker 必須** の構成です。GitHub MCP を Docker コンテナで起動することで、PAT を平文設定ファイル（`~/.claude.json` 等）に書き残さない設計にしています。
+このリポジトリは **Docker 必須** の構成です。GitHub MCP を Docker コンテナで起動することで、PAT を平文設定ファイルに書き残さない設計にしています。
 
 | 用途 | 必要なもの |
 |---|---|
@@ -81,6 +83,7 @@ cd ~/dotfiles/claude-config
 `setup.sh` は以下を行います：
 - `agents/`, `commands/`, `hooks/`, `rules/`, `skills/` を `~/.claude/` にコピー
 - `settings.json.template` からパスを解決して `~/.claude/settings.json` を生成
+- `mcp.json` の MCP サーバー設定を `~/.claude.json` にマージ（既存の設定は保持し、不足分のみ追加）
 
 ## 自走開発の始め方
 
@@ -204,12 +207,12 @@ git pull
 ./setup.sh
 ```
 
-## プラグイン（別マシンで手動インストールが必要）
+## MCP・プラグインの管理
 
-設定ファイルに有効化フラグは含まれていますが、プラグイン本体は別途インストールが必要です：
+| 種別 | 管理方法 |
+|---|---|
+| MCP サーバー（GitHub / Playwright / Figma） | `mcp.json` → `setup.sh` が `~/.claude.json` にマージ |
+| プラグイン（Slack / Postman / Supabase / Vercel） | `settings.json.template` の `enabledPlugins` で自動有効化 |
 
-```bash
-claude plugin install slack
-claude plugin install supabase
-claude plugin install vercel
-```
+新しい MCP サーバーを追加した場合は `mcp.json` に追記して `setup.sh` を再実行してください。  
+新しいプラグインを有効化した場合は `settings.json.template` の `enabledPlugins` に追記してください。
