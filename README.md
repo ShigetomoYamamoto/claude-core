@@ -4,14 +4,16 @@ Claude Code のグローバル設定を管理する dotfiles リポジトリ。
 
 新しいマシンで `setup.sh` を実行するだけで、AI エージェントが自走して開発を完成させるための共通基盤が整います。
 
+> 設計の背景や判断理由は [`docs/requirements.md`](./docs/requirements.md)（要件定義）、[`docs/architecture.md`](./docs/architecture.md)（アーキテクチャ）、[`docs/adr/`](./docs/adr/)（設計判断記録）を参照してください。
+
 ## 設計方針
 
 **グローバル設定（このリポジトリ）** と **プロジェクト設定（`.claude/`）** で役割を分離しています。
 
 | 層 | 場所 | 内容 |
 |---|---|---|
-| グローバル | `~/.claude/`（このリポジトリ） | git・gh 操作、品質ガード、汎用エージェント |
-| プロジェクト | `プロジェクトルート/.claude/` | スタック固有コマンド、ドメイン知識、CI設定 |
+| グローバル | `~/.claude/`（このリポジトリ） | スタック非依存・全プロジェクト共通の仕組み |
+| プロジェクト | `プロジェクトルート/.claude/` | スタック固有の実装（デプロイ先・ビルドコマンド・言語別 hook） |
 
 プロジェクト側は `/init-autonomous` を実行すると自動生成されます。
 
@@ -19,12 +21,13 @@ Claude Code のグローバル設定を管理する dotfiles リポジトリ。
 
 | ディレクトリ/ファイル | 内容 |
 |---|---|
-| `agents/` | 9体のカスタムエージェント（architect, planner, tdd-guide, code-reviewer, security-reviewer など） |
-| `commands/` | 15個のスラッシュコマンド（/design, /plan, /tdd, /commit, /create-pr, /init-autonomous など） |
-| `hooks/` | 品質ガードフック（シークレット検出・不要ドキュメント生成のブロック） |
-| `rules/` | コーディングスタイル、テスト要件、セキュリティ、エージェント運用ガイドライン、Claude 使用効率化 |
+| `agents/` | 15体のカスタムエージェント（architect, planner, tdd-guide, code-reviewer, requirements-analyst, deploy-runner など） |
+| `commands/` | 21個のスラッシュコマンド（/requirements, /design, /plan, /tdd, /commit, /deploy, /rollback など） |
+| `hooks/` | 品質ガード・安全装置（シークレット検出・doc 生成ブロック・git 破壊操作ブロック・PR base チェック・大量削除確認） |
+| `rules/` | コーディングスタイル・テスト・セキュリティ・エージェント運用ルール・Claude 使用効率化 |
 | `skills/` | 参照スキル（git-workflow, tdd-workflow, security-review） |
-| `settings.json.template` | Claude Code 設定テンプレート（パス自動解決・プラグイン有効化設定を含む） |
+| `docs/` | 要件定義・アーキテクチャ・ADR |
+| `settings.json.template` | Claude Code 設定テンプレート（パス自動解決・プラグイン有効化を含む） |
 | `mcp.json` | MCP サーバー設定（GitHub / Playwright / Figma） |
 
 ## settings.json.template の主な設定
@@ -33,19 +36,20 @@ Claude Code のグローバル設定を管理する dotfiles リポジトリ。
 - `Bash(git *)` / `Bash(gh *)` — どのプロジェクトでも git/gh 操作が確認なしで動作
 - `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS: 1` — 複数エージェントの並列実行を有効化
 - `enabledPlugins` — Slack プラグインを自動有効化
-- フック: Stop 時に音声通知（macOS: afplay / Linux: terminal bell）
+- フック: PreToolUse（doc 生成ブロック・git 破壊操作ブロック・PR base チェック・大量削除確認）、PostToolUse（シークレット検出）、Stop 音声通知
 
 ## 新しいマシンへのインストール
 
 ### 前提条件
 
-このリポジトリは **Docker 必須** の構成です。GitHub MCP を Docker コンテナで起動することで、PAT を平文設定ファイルに書き残さない設計にしています。
+| ツール | 最低バージョン | 備考 |
+|---|---|---|
+| bash | 3.2+ | macOS デフォルト |
+| python3 | 3.8+ | `setup.sh` と hook 用 |
+| git | 2.0+ | |
+| Docker | 20.0+ | GitHub MCP 用（推奨） |
 
-| 用途 | 必要なもの |
-|---|---|
-| GitHub MCP | **Docker（起動済み）** + 環境変数 `GITHUB_PERSONAL_ACCESS_TOKEN` |
-| Playwright MCP | Node.js / npx |
-| Figma MCP | Figma Desktop アプリ（起動済み） |
+対応 OS: macOS / Linux（GUI 環境前提・Windows 非対応）
 
 #### Docker のインストール
 
@@ -102,9 +106,37 @@ cd ~/dotfiles/claude-config
 ```
 
 `setup.sh` は以下を行います：
-- `agents/`, `commands/`, `hooks/`, `rules/`, `skills/` を `~/.claude/` にコピー
-- `settings.json.template` からパスを解決して `~/.claude/settings.json` を生成
-- `mcp.json` の MCP サーバー設定を `~/.claude.json` にマージ（既存の設定は保持し、不足分のみ追加）
+
+1. **preflight check** — 必須ツール（bash・python3・git・docker）のバージョン確認
+2. `agents/`, `commands/`, `hooks/`, `rules/`, `skills/` を `~/.claude/` にコピー
+3. `settings.json.template` からパスを解決して `~/.claude/settings.json` を生成
+4. `mcp.json` の MCP サーバー設定を `~/.claude.json` にマージ（既存設定は保持し、不足分のみ追加）
+
+各ステップは `[1/4] ✓ ...` 形式で進捗表示します。失敗時はどのステップまで成功したかを表示します。
+
+## 開発フロー
+
+Claude Code は2つのモードで開発を進めます。
+
+### 全自動モード（要件 → デプロイまで）
+
+要件を伝えると、Claude が以下を順に進めます。
+
+```
+/requirements → /design → /plan → /tdd → /commit → /create-pr → /migrate → /deploy
+（要件分析）   （設計）  （計画） （実装） （コミット） （PR作成）   （DB変更） （デプロイ）
+```
+
+各ステップで承認が必要な場面（要件・設計・コミット・PR）では止まります。
+
+### サポートモード（タスク → PR まで）
+
+具体的なタスク・GitHub Issue・バグ報告を渡すと、Claude が以下を順に進めます。
+
+```
+/analyze-task → /plan → /tdd → /commit → /create-pr → /respond-review
+（タスク分析）  （計画） （実装） （コミット） （PR作成）   （レビュー対応）
+```
 
 ## 自走開発の始め方
 
@@ -116,7 +148,7 @@ cd ~/dotfiles/claude-config
 Issue #12 を実装して
 ```
 
-Claude が Issue の内容を読み、仕様書・設計書・コードベースと照合した上で、計画 → 実装 → コミット → PR 作成まで自律的に進めます。
+Claude が Issue を `/analyze-task` で分析し、計画 → 実装 → コミット → PR 作成まで自律的に進めます。
 
 ### 2. やりたいことを日本語で伝える
 
@@ -128,36 +160,19 @@ Claude が Issue の内容を読み、仕様書・設計書・コードベース
 ログイン時のエラーメッセージが表示されないバグを直して
 ```
 
-Claude がタスクの内容を判断し、設計が必要なら `/design`、実装計画が必要なら `/plan` を自動的に起動して進めます。
+Claude がタスクの種類を判断します：
+- 新機能・要件が曖昧 → `/requirements` で要件分析から始める
+- 具体的なタスク → `/analyze-task` で分解
+- 設計判断が必要 → `/design` を起動
 
 ### 3. コマンドで明示的に起動する
 
-設計から始めたい場合：
 ```
-/design パスワードリセット機能
+/requirements ユーザー認証機能を作りたい    # 要件から始める（全自動モード）
+/design パスワードリセット機能               # 設計から始める
+/plan Issue #12 の実装                       # 計画から始める
+/analyze-task #42                            # タスク分析から始める（サポートモード）
 ```
-
-実装計画から始めたい場合（設計済みの機能）：
-```
-/plan Issue #12 の実装
-```
-
----
-
-### Claude が自律的に行うこと
-
-タスクを受け取った Claude は以下を順に実行します。ユーザーの承認が必要な場面では必ず提示して止まります。
-
-```
-1. 仕様・設計・コードベースの把握
-2. 設計判断が必要 → /design（承認待ち）
-3. 実装計画の立案 → /plan（承認待ち）
-4. テストファーストで実装 → /tdd
-5. コードレビュー → コミット（承認待ち）
-6. コードレビュー → PR 作成（承認待ち）
-```
-
----
 
 ## 使い方
 
@@ -166,28 +181,25 @@ Claude がタスクの内容を判断し、設計が必要なら `/design`、実
 仕様書・設計書など必要な資料が揃っている前提です。
 
 **ステップ1: AI エージェント自走基盤を生成**
+
 ```
 /init-autonomous
 ```
 
 スタックを自動検出し、以下を一括生成します：
+
 - `.claude/settings.json` — スタック固有コマンドの権限設定（npm/pest/pytest/go/cargo など）
+- `.claude/hooks/` — スタック別デバッグ出力検知（JS/TS の `console.log`・Python の `print()` など）
 - `CLAUDE.md` — プロジェクトルール・エンティティ・ロール定義
 - `.claude/rules/`, `.claude/commands/`, `.claude/agents/` — スタック固有の設定
 - `docs/` — 仕様書テンプレート・ADR・コードマップ
-- `.github/` — CI/CD・PRテンプレート・Issue テンプレート
+- `.github/` — CI/CD・PR テンプレート・Issue テンプレート
 
 **ステップ2: 既存資料を Claude に読み込ませる**
 
 `/init-autonomous` の実行中に「既存の仕様書・設計書はありますか？」と聞かれます。ファイルパスを答えると Claude が内容を読み取り、`CLAUDE.md` の参照パスを自動で更新します。
 
-ここまで完了すると、Claude が仕様・設計・コードベースを把握した状態になります。以降は通常の開発フローで進めます。
-
-```
-# 通常の開発フロー
-/plan      → /tdd      → /commit    → /create-pr
-（実装計画）  （TDD実装）  （レビュー→コミット）  （レビュー→PR）
-```
+以降は通常の開発フローで進めます。
 
 ---
 
@@ -196,26 +208,27 @@ Claude がタスクの内容を判断し、設計が必要なら `/design`、実
 コードも資料もほぼない状態から始めます。まず要件定義・設計を行い、その成果物を使って自走基盤を構築します。
 
 ```
-# ステップ1: 要件定義・システム設計
+# ステップ1: 要件定義
+/requirements
+
+# ステップ2: システム設計
 /design
-```
 
-機能要件・非機能要件・データモデル・APIコントラクトを定義します。承認するまで実装には進みません。
-
-```
-# ステップ2: AI エージェント自走基盤を生成
+# ステップ3: AI エージェント自走基盤を生成
 /init-autonomous
 ```
 
+機能要件・非機能要件・データモデル・API コントラクトを定義します。承認するまで実装には進みません。
+
 ```
-# ステップ3: 設計内容を docs/ に反映
-docs/01_product-specifications.md  ← /design の要件定義を記入
-docs/02_detailed-design.md         ← /design の詳細設計を記入
+# ステップ4: 設計内容を docs/ に反映
+docs/01_product-specifications.md  ← /requirements + /design の成果物
+docs/02_detailed-design.md         ← /design の詳細設計
 ```
 
 ```
-# ステップ4: 実装開始
-/plan      → /tdd      → /commit    → /create-pr
+# ステップ5: 実装開始
+/plan → /tdd → /commit → /create-pr → /migrate → /deploy
 ```
 
 ---
@@ -260,6 +273,7 @@ git pull
 2. `settings.json.template` の `hooks` セクションに配線追加
 
 設計原則：
+
 - 予期せぬエラーは `exit 0`（Claude を止めない）
 - 意図的ブロックのみ `exit 2`
 - ネットワーク通信禁止（ローカル処理のみ）
