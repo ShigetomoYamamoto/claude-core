@@ -392,15 +392,44 @@ sudo apt install gh
 
 {{ USER_ROLES を記載。「認証なし」の場合はその旨 }}
 
-## エージェント向けスラッシュコマンド
+## スラッシュコマンド
 
+### 全自動モード（要件 → デプロイ）
 | コマンド | 役割 |
 |---------|------|
-| `/implement-feature` | 仕様確認 → TDD → 実装 → レビュー → コミットの一気通貫 |
-| `/issue-to-pr` | GitHub Issue 読込 → 実装 → PR 作成の全自動 |
-| `/spec` | 実装前に仕様書の該当箇所を読んで整理 |
+| `/requirements` | 要件分析（曖昧な要望を構造化要件に変換） |
+| `/design` | システム設計（DB スキーマ・API コントラクト・技術選定） |
+| `/plan` | 実装計画 |
+| `/tdd` | テスト駆動開発で実装 |
+| `/migrate` | DB マイグレーション実行 |
+| `/deploy` | デプロイ + 検証 + 自動ロールバック |
+| `/rollback` | 手動ロールバック |
+
+### サポートモード（タスク → PR）
+| コマンド | 役割 |
+|---------|------|
+| `/analyze-task` | タスク・課題・バグ報告を実装可能な単位に分解 |
+| `/plan` | 実装計画 |
+| `/tdd` | テスト駆動開発で実装 |
+| `/respond-review` | PR レビューコメントへの対応 |
+
+### 共通
+| コマンド | 役割 |
+|---------|------|
+| `/code-review` | コードレビュー（自分のコード） |
+| `/commit` | Conventional Commits 形式でコミット |
+| `/create-pr` | PR 作成（base は develop 固定） |
+| `/build-fix` | ビルド・型エラーの修正 |
+| `/test-coverage` | カバレッジ補完 |
+| `/refactor-clean` | デッドコード削除 |
+| `/e2e` | E2E テスト生成・実行 |
+| `/update-docs` | ドキュメント同期 |
+| `/update-codemaps` | コードマップ更新 |
+
+### プロジェクト固有（このプロジェクトのみ）
+| コマンド | 役割 |
+|---------|------|
 | `/precommit-check` | フォーマット・テスト・型チェック・静的解析を順番に実行 |
-| `/create-pr` | コミット履歴を分析して PR テンプレを埋めて作成 |
 | `/audit-custom` | プロジェクト固有の静的解析を実行 |
 ```
 
@@ -1796,6 +1825,135 @@ indent_style = tab
   }
 }
 ```
+
+---
+
+### 4-10. プロジェクト側 hook（スタック別デバッグ出力検知）
+
+検出スタックに応じて `.claude/hooks/debug-output-detector.py` を生成し、編集直後に言語固有のデバッグ出力（`console.log` / `print()` / `var_dump()` 等）を検知する。グローバル側ではスタック非依存の検知ができないため、プロジェクト側で対応する設計。
+
+#### `.claude/settings.json` への配線追加
+
+既存の `.claude/settings.json` に `hooks.PostToolUse` セクションを追加（または既存にマージ）:
+
+```json
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 .claude/hooks/debug-output-detector.py"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+#### `.claude/hooks/debug-output-detector.py`
+
+```python
+#!/usr/bin/env python3
+"""PostToolUse(Edit|Write|MultiEdit): 言語別デバッグ出力を即時警告"""
+import json, sys, re
+
+try:
+    data = json.load(sys.stdin)
+    path = data.get('tool_input', {}).get('file_path', '')
+    if not path:
+        sys.exit(0)
+
+    # 検出スタックに応じて初期テンプレートを生成する
+    # 不要な言語の行は /init-autonomous 生成時に削除する
+    PATTERNS = {
+        ('.js', '.ts', '.jsx', '.tsx', '.mjs', '.cjs'): [r'console\.log', r'console\.debug', r'\bdebugger\b'],
+        ('.py',):  [r'\bprint\(', r'\bbreakpoint\(', r'pdb\.set_trace'],
+        ('.php',): [r'\bvar_dump\(', r'\bprint_r\(', r'\bdd\(', r'\bdie\('],
+        ('.rb',):  [r'\bbinding\.pry\b', r'\bbyebug\b'],
+        ('.go',):  [r'fmt\.Println\('],
+        ('.rs',):  [r'\bdbg!', r'\bprintln!'],
+    }
+
+    matched = next((ps for exts, ps in PATTERNS.items() if any(path.endswith(e) for e in exts)), None)
+    if not matched:
+        sys.exit(0)
+
+    try:
+        content = open(path).read()
+    except Exception:
+        sys.exit(0)
+
+    found = []
+    for n, line in enumerate(content.splitlines(), 1):
+        if any(re.search(p, line) for p in matched):
+            found.append((n, line.strip()))
+
+    if found:
+        print(f'⚠️  デバッグ出力を検出: {path}')
+        for n, line in found[:5]:
+            print(f'  {n}: {line}')
+except SystemExit:
+    raise
+except Exception:
+    sys.exit(0)
+```
+
+**設計原則**: 100 行以下・単一責務・予期せぬエラーは `exit 0`・ネットワーク通信禁止（グローバル hook と同じ規約）。
+
+---
+
+### 4-11. スタック固有の品質ガード設定
+
+検出スタックに応じて、品質ガード用の追加設定をプロジェクトに生成する。
+
+#### Web フロントエンド検出時（Next.js / React / Vue / Nuxt）
+
+`eslint.config.js`（または既存の設定）にアクセシビリティチェックを追加:
+
+```js
+// React 系
+import jsxA11y from 'eslint-plugin-jsx-a11y'
+
+export default [
+  // ...
+  {
+    plugins: { 'jsx-a11y': jsxA11y },
+    rules: jsxA11y.configs.recommended.rules,
+  },
+]
+```
+
+devDependencies に追加: `eslint-plugin-jsx-a11y`（React 系）または `eslint-plugin-vuejs-accessibility`（Vue 系）。
+
+#### Web プロジェクト検出時（フロント or バック問わず HTTP サービス）
+
+`package.json` に Lighthouse CI スクリプトを追加（テンプレートのみ・実 URL は後でユーザーが記入）:
+
+```json
+{
+  "scripts": {
+    "lighthouse": "lhci autorun"
+  },
+  "devDependencies": {
+    "@lhci/cli": "^0.13.0"
+  }
+}
+```
+
+`.github/workflows/lighthouse.yml` のテンプレートも生成（プレビュー URL 取得後にユーザーが有効化）。
+
+#### API サーバー検出時（Express / FastAPI / Laravel など）
+
+`package.json` または `pyproject.toml` などにベンチマークツールを追加（テンプレート）:
+- Node.js: `autocannon`
+- Python: `pytest-benchmark`
+- PHP: `phpbench`
+
+これらは初期生成のみ。実際の測定対象・閾値はプロジェクトで決める。
 
 ---
 
