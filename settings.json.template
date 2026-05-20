@@ -29,10 +29,6 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 __HOME__/.claude/hooks/console-log-warning.py"
-          },
-          {
-            "type": "command",
             "command": "python3 __HOME__/.claude/hooks/secret-detection.py"
           }
         ]
@@ -44,10 +40,6 @@
           {
             "type": "command",
             "command": "command -v afplay > /dev/null 2>&1 && afplay -v 0.2 /System/Library/Sounds/Glass.aiff || printf '\\a'"
-          },
-          {
-            "type": "command",
-            "command": "python3 __HOME__/.claude/hooks/console-log-audit.py"
           }
         ]
       }

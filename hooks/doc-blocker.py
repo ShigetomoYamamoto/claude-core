@@ -12,7 +12,7 @@ if os.path.exists(path):
     sys.exit(0)  # 既存ファイルの編集は許可
 
 basename = os.path.basename(path)
-parts = path.replace('\\', '/').split('/')
+parts = path.split('/')
 
 ALLOWED_NAMES = {'CLAUDE.md', 'ONBOARDING.md', 'CHANGELOG.md', 'MEMORY.md', 'SKILL.md'}
 ALLOWED_DIRS  = {'.claude', 'docs', '.github', 'memory', 'skills', 'commands', 'agents', 'rules'}
