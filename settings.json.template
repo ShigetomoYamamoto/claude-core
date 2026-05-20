@@ -21,6 +21,23 @@
             "command": "python3 __HOME__/.claude/hooks/doc-blocker.py"
           }
         ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 __HOME__/.claude/hooks/git-destructive-blocker.py"
+          },
+          {
+            "type": "command",
+            "command": "python3 __HOME__/.claude/hooks/pr-base-checker.py"
+          },
+          {
+            "type": "command",
+            "command": "python3 __HOME__/.claude/hooks/mass-delete-blocker.py"
+          }
+        ]
       }
     ],
     "PostToolUse": [
