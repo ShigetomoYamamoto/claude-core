@@ -32,7 +32,7 @@ Claude Code のグローバル設定を管理する dotfiles リポジトリ。
 - `defaultMode: auto` — ほとんどの操作を自動承認
 - `Bash(git *)` / `Bash(gh *)` — どのプロジェクトでも git/gh 操作が確認なしで動作
 - `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS: 1` — 複数エージェントの並列実行を有効化
-- `enabledPlugins` — Slack / Postman / Supabase / Vercel プラグインを自動有効化
+- `enabledPlugins` — Slack プラグインを自動有効化
 - フック: Stop 時に音声通知（macOS: afplay / Linux: terminal bell）+ console.log 監査
 
 ## 新しいマシンへのインストール
@@ -212,7 +212,7 @@ git pull
 | 種別 | 管理方法 |
 |---|---|
 | MCP サーバー（GitHub / Playwright / Figma） | `mcp.json` → `setup.sh` が `~/.claude.json` にマージ |
-| プラグイン（Slack / Postman / Supabase / Vercel） | `settings.json.template` の `enabledPlugins` で自動有効化 |
+| プラグイン（Slack） | `settings.json.template` の `enabledPlugins` で自動有効化 |
 
 新しい MCP サーバーを追加した場合は `mcp.json` に追記して `setup.sh` を再実行してください。  
 新しいプラグインを有効化した場合は `settings.json.template` の `enabledPlugins` に追記してください。
