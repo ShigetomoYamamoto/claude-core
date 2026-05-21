@@ -191,25 +191,50 @@ sudo apt install gh
 
 未設定の MCP サーバーをプロジェクトルートの `.mcp.json` に追加する。既存の `.mcp.json` がある場合はマージする（上書きしない）。
 
-```json
-{
-  "mcpServers": {
-    "github": {
-      "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-github"],
-      "env": {
-        "GITHUB_TOKEN": "${GITHUB_TOKEN}"
-      }
-    },
-    "playwright": {
-      "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-playwright"]
-    }
-  }
-}
-```
+以下の python3 コマンドで生成する:
 
-環境変数は `${変数名}` プレースホルダーで記載する。実際の値は `.env` にユーザーが設定する。
+```bash
+python3 << 'PYEOF'
+import json, os
+
+# 検出結果に応じて追加するサーバーを構築（不要なものは除く）
+new_servers = {
+    "github": {
+        "type": "stdio",
+        "command": "docker",
+        "args": ["run", "-i", "--rm", "-e", "GITHUB_PERSONAL_ACCESS_TOKEN",
+                 "ghcr.io/github/github-mcp-server"],
+        "env": {}
+    },
+    # playwright が依存にある場合は追加:
+    # "playwright": {
+    #     "type": "stdio",
+    #     "command": "npx",
+    #     "args": ["@playwright/mcp@latest"],
+    #     "env": {}
+    # },
+}
+
+path = ".mcp.json"
+existing = {}
+if os.path.exists(path):
+    with open(path) as f:
+        existing = json.load(f)
+
+servers = existing.get("mcpServers", {})
+added = []
+for name, config in new_servers.items():
+    if name not in servers:
+        servers[name] = config
+        added.append(name)
+
+existing["mcpServers"] = servers
+with open(path, "w") as f:
+    json.dump(existing, f, indent=2)
+
+print(f"✓ .mcp.json を更新しました（追加: {added}）")
+PYEOF
+```
 
 ### 3-E: Claude Code Plugins の案内
 
