@@ -274,7 +274,9 @@ PYEOF
 検出したスタックに応じて、`auto` モードで確認なしに実行できるコマンドを定義する。
 **git は グローバル設定で `Bash(git *)` / `Bash(gh *)` として許可済みのため含めない。**
 
-以下の python3 コマンドで生成する（複数スタック検出時は `allow` 配列を自動マージ）:
+以下の手順で生成する（複数スタック検出時は `allow` 配列を自動マージ）:
+
+**Step 1: `/tmp/` に生成**（検出スタックに合わせてコメントアウトを解除すること）
 
 ```bash
 python3 << 'PYEOF'
@@ -304,30 +306,38 @@ STACK_PERMISSIONS = {
     # ],
 }
 
-path = ".claude/settings.json"
-os.makedirs(".claude", exist_ok=True)
 existing = {}
-if os.path.exists(path):
-    with open(path) as f:
+if os.path.exists(".claude/settings.json"):
+    with open(".claude/settings.json") as f:
         existing = json.load(f)
 
 current_allow = existing.get("permissions", {}).get("allow", [])
 new_allow = [p for perms in STACK_PERMISSIONS.values() for p in perms]
-merged = list(dict.fromkeys(current_allow + new_allow))  # 重複除去・順序保持
+merged = list(dict.fromkeys(current_allow + new_allow))
 
 if "permissions" not in existing:
     existing["permissions"] = {}
 existing["permissions"]["allow"] = merged
 existing["defaultMode"] = "auto"
 
-with open(path, "w") as f:
+with open("/tmp/claude_settings.json", "w") as f:
     json.dump(existing, f, indent=2)
 
-print(f"✓ .claude/settings.json を更新しました（allow: {len(merged)} 件）")
+print(f"✓ /tmp/claude_settings.json を生成しました（allow: {len(merged)} 件）")
 PYEOF
 ```
 
-**実行前に検出スタックに合わせてコメントアウトを解除すること。**
+**Step 2: プロジェクトに配置**
+
+```bash
+mkdir -p .claude && cp /tmp/claude_settings.json .claude/settings.json && echo "✓ .claude/settings.json を配置しました"
+```
+
+cp がブロックされた場合はユーザーに以下を実行してもらう:
+
+```
+! mkdir -p .claude && cp /tmp/claude_settings.json .claude/settings.json
+```
 
 ---
 
@@ -1832,17 +1842,15 @@ indent_style = tab
 
 #### `.claude/settings.json` への配線追加
 
-既存の `.claude/settings.json` に `hooks.PostToolUse` セクションを追加（または既存にマージ）する。以下の python3 コマンドを実行:
+**Step 1: `/tmp/` でマージ**
 
 ```bash
 python3 << 'PYEOF'
 import json, os
 
-path = ".claude/settings.json"
-os.makedirs(".claude", exist_ok=True)
 existing = {}
-if os.path.exists(path):
-    with open(path) as f:
+if os.path.exists(".claude/settings.json"):
+    with open(".claude/settings.json") as f:
         existing = json.load(f)
 
 new_hook = {
@@ -1852,21 +1860,34 @@ new_hook = {
 
 hooks = existing.setdefault("hooks", {})
 post_tool = hooks.setdefault("PostToolUse", [])
-
-matchers = [h.get("matcher") for h in post_tool]
-if new_hook["matcher"] not in matchers:
+if new_hook["matcher"] not in [h.get("matcher") for h in post_tool]:
     post_tool.append(new_hook)
 
-with open(path, "w") as f:
+with open("/tmp/claude_settings.json", "w") as f:
     json.dump(existing, f, indent=2)
 
-print("✓ .claude/settings.json に hooks を追加しました")
+print("✓ /tmp/claude_settings.json に hooks を追加しました")
 PYEOF
+```
+
+**Step 2: プロジェクトに配置**
+
+```bash
+mkdir -p .claude && cp /tmp/claude_settings.json .claude/settings.json && echo "✓ 配置しました"
+```
+
+cp がブロックされた場合:
+
+```
+! mkdir -p .claude && cp /tmp/claude_settings.json .claude/settings.json
 ```
 
 #### `.claude/hooks/debug-output-detector.py`
 
-```python
+**Step 1: `/tmp/` に生成**（不要な言語の行は削除すること）
+
+```bash
+cat > /tmp/debug-output-detector.py << 'HEREDOC'
 #!/usr/bin/env python3
 """PostToolUse(Edit|Write|MultiEdit): 言語別デバッグ出力を即時警告"""
 import json, sys, re
@@ -1877,8 +1898,6 @@ try:
     if not path:
         sys.exit(0)
 
-    # 検出スタックに応じて初期テンプレートを生成する
-    # 不要な言語の行は /init-autonomous 生成時に削除する
     PATTERNS = {
         ('.js', '.ts', '.jsx', '.tsx', '.mjs', '.cjs'): [r'console\.log', r'console\.debug', r'\bdebugger\b'],
         ('.py',):  [r'\bprint\(', r'\bbreakpoint\(', r'pdb\.set_trace'],
@@ -1910,6 +1929,19 @@ except SystemExit:
     raise
 except Exception:
     sys.exit(0)
+HEREDOC
+```
+
+**Step 2: プロジェクトに配置**
+
+```bash
+mkdir -p .claude/hooks && cp /tmp/debug-output-detector.py .claude/hooks/debug-output-detector.py && echo "✓ 配置しました"
+```
+
+cp がブロックされた場合:
+
+```
+! mkdir -p .claude/hooks && cp /tmp/debug-output-detector.py .claude/hooks/debug-output-detector.py
 ```
 
 **設計原則**: 100 行以下・単一責務・予期せぬエラーは `exit 0`・ネットワーク通信禁止（グローバル hook と同じ規約）。
