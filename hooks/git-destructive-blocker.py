@@ -9,14 +9,15 @@ def current_branch():
     except Exception:
         return ''
 
-def strip_quoted(s):
-    """クォート内の文字列を除去して誤検知を防ぐ"""
-    return re.sub(r"'[^']*'|\"[^\"]*\"", '', s)
+def is_git_invocation(cmd, subcmd):
+    """git <subcmd> がシェル演算子の直後か行頭にある（実際に実行される）か判定する。
+    grep/echo/python -c 等の引数内に含まれる場合は除外する。"""
+    pattern = rf'(?:^|&&|\|\||;|\n)\s*(?:\S+\s+)*git\s+{re.escape(subcmd)}\b'
+    return bool(re.search(pattern, cmd, re.MULTILINE))
 
 try:
     data = json.load(sys.stdin)
     cmd = data.get('tool_input', {}).get('command', '')
-    cmd_unquoted = strip_quoted(cmd)
 
     if not cmd or 'git' not in cmd:
         sys.exit(0)
@@ -31,7 +32,7 @@ try:
     )
 
     # git commit on protected branch
-    if re.search(r'\bgit\s+commit\b', cmd_unquoted):
+    if is_git_invocation(cmd, 'commit'):
         branch = current_branch()
         if branch in PROTECTED:
             print(f'🔴 保護されたブランチ "{branch}" 上でコミットしようとしました。')
@@ -41,7 +42,7 @@ try:
             sys.exit(2)
 
     # git push (non-force) on protected branch
-    if re.search(r'\bgit\s+push\b', cmd_unquoted) and not re.search(r'(?:-f\b|--force\b|--force-with-lease\b)', cmd_unquoted):
+    if is_git_invocation(cmd, 'push') and not re.search(r'(?:-f\b|--force\b|--force-with-lease\b)', cmd):
         branch = current_branch()
         if branch in PROTECTED:
             print(f'🔴 保護されたブランチ "{branch}" から直接 push しようとしました。')
@@ -50,10 +51,10 @@ try:
             sys.exit(2)
 
     # git push --force / --force-with-lease to protected branch
-    push_force = re.search(r'\bgit\s+push\s+.*(?:-f\b|--force\b|--force-with-lease\b)', cmd_unquoted)
+    push_force = re.search(r'(?:^|&&|\|\||;|\n)\s*(?:\S+\s+)*git\s+push\s+.*(?:-f\b|--force\b|--force-with-lease\b)', cmd, re.MULTILINE)
     if push_force:
         for b in PROTECTED:
-            if re.search(rf'\b{b}\b', cmd_unquoted):
+            if re.search(rf'\b{b}\b', cmd):
                 print(f'🔴 git push --force を {b} ブランチに対して実行しようとしました。')
                 print('保護されたブランチへの force push は禁止です。')
                 sys.exit(2)
