@@ -2,6 +2,13 @@
 """PreToolUse(Bash): git の破壊的操作をブロックする"""
 import json, sys, re, subprocess
 
+def current_branch():
+    try:
+        r = subprocess.run(['git', 'branch', '--show-current'], capture_output=True, text=True, timeout=5)
+        return r.stdout.strip()
+    except Exception:
+        return ''
+
 try:
     data = json.load(sys.stdin)
     cmd = data.get('tool_input', {}).get('command', '')
@@ -9,7 +16,33 @@ try:
     if not cmd or 'git' not in cmd:
         sys.exit(0)
 
-    PROTECTED = ('main', 'master', 'develop')
+    PROTECTED = (
+        'main', 'master',           # GitHub/Git デフォルトブランチ
+        'develop', 'development',   # Git Flow 開発ブランチ
+        'staging',                  # ステージング環境
+        'release',                  # リリースブランチ
+        'production', 'prod',       # 本番環境
+        'trunk',                    # Trunk-based development
+    )
+
+    # git commit on protected branch
+    if re.search(r'\bgit\s+commit\b', cmd):
+        branch = current_branch()
+        if branch in PROTECTED:
+            print(f'🔴 保護されたブランチ "{branch}" 上でコミットしようとしました。')
+            print('作業ブランチを作成してから作業してください。')
+            print('  /create-branch を使用するか:')
+            print('  git checkout -b <prefix>/<summary>_YYYYMMDD')
+            sys.exit(2)
+
+    # git push (non-force) on protected branch
+    if re.search(r'\bgit\s+push\b', cmd) and not re.search(r'(?:-f\b|--force\b|--force-with-lease\b)', cmd):
+        branch = current_branch()
+        if branch in PROTECTED:
+            print(f'🔴 保護されたブランチ "{branch}" から直接 push しようとしました。')
+            print('作業ブランチから PR を作成してください。')
+            print('  /create-branch → 実装 → /create-pr の手順で進めてください。')
+            sys.exit(2)
 
     # git push --force / --force-with-lease to protected branch
     push_force = re.search(r'\bgit\s+push\s+.*(?:-f\b|--force\b|--force-with-lease\b)', cmd)
@@ -17,7 +50,7 @@ try:
         for b in PROTECTED:
             if re.search(rf'\b{b}\b', cmd):
                 print(f'🔴 git push --force を {b} ブランチに対して実行しようとしました。')
-                print('保護されたブランチ（main/master/develop）への force push は禁止です。')
+                print('保護されたブランチへの force push は禁止です。')
                 sys.exit(2)
 
     # git reset --hard with unpushed commits

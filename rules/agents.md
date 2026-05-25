@@ -1,5 +1,20 @@
 # Agent Orchestration
 
+## Pre-Implementation Branch Check (MANDATORY)
+
+Before writing or editing any code file, always verify the current branch:
+
+1. Run `git branch --show-current`
+2. If the result is `main`, `master`, or `develop` — **STOP immediately**
+   - Do NOT proceed with any file changes
+   - Tell the user: "現在 protected branch にいます。作業ブランチを作成してから実装を開始します。"
+   - Run `/create-branch` (or `git checkout -b <prefix>/<summary>_YYYYMMDD` if develop is unavailable)
+   - Resume implementation only after confirming the new branch
+
+This check applies to ALL agents that write or edit files.
+
+---
+
 ## Proactive Agent Invocation
 
 These agents MUST be invoked automatically — without waiting for the user to ask:
