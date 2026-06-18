@@ -30,6 +30,30 @@ Claude Code のグローバル設定を管理する dotfiles リポジトリ。
 | `settings.json.template` | Claude Code 設定テンプレート（パス自動解決・プラグイン有効化を含む） |
 | `mcp.json` | MCP サーバー設定（GitHub / Playwright / Figma） |
 
+## ループ自走（Loop Engineering）運用
+
+目的を渡せば検証しながら自走する仕組みを、安全装置とセットで備えています。
+
+| 成果物 | 種別 | 役割 |
+|--------|------|------|
+| `rules/loop-safety.md` | ルール | 自走の前提条件・ハードストップ（ターン/時間/トークン上限）・ゴールドリフト対策・不可逆操作の確認 |
+| `commands/autorun.md`（`/autorun`） | コマンド | 完了条件を渡すと達成まで自走。`/goal`・`/loop`・`ScheduleWakeup`・`CronCreate`・`Workflow` を使い分け |
+| `rules/parallel-worktree.md` | ルール | 並列エージェントが書き込み競合する場合の worktree 分離 |
+| `rules/memory.md` | ルール | セッションを跨いで学習を `memory/` に書き戻す（アウターループ） |
+| `commands/verify-loop.md`（`/verify-loop`） | コマンド | レビュー→反証検証→修正→再判定を CRITICAL/HIGH=0 まで自律で回す（`Workflow`） |
+
+**安全の原則:** ブレーキ（ハードストップ・専用ブランチ・機械的な成功判定）を先に設定してから自走させる。機械的に成功判定できないタスクは自走させない。
+
+**典型的な使い方:**
+
+```
+# 完了条件まで自走（上限つき）
+/autorun tests/ が全 pass し ruff がクリーンになるまで（最大15ターン）
+
+# 変更を CRITICAL/HIGH=0 まで自律レビュー&修正
+/verify-loop
+```
+
 ## settings.json.template の主な設定
 
 - `defaultMode: auto` — ほとんどの操作を自動承認
