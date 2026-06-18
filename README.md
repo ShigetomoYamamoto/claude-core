@@ -24,7 +24,7 @@ Claude Code のグローバル設定を管理する dotfiles リポジトリ。
 | `agents/` | 15体のカスタムエージェント（architect, planner, tdd-guide, code-reviewer, requirements-analyst, deploy-runner など） |
 | `commands/` | 21個のスラッシュコマンド（/requirements, /design, /plan, /tdd, /commit, /deploy, /rollback など） |
 | `hooks/` | 品質ガード・安全装置（シークレット検出・doc 生成ブロック・git 破壊操作ブロック・PR base チェック・大量削除確認） |
-| `rules/` | コーディングスタイル・テスト・セキュリティ・エージェント運用ルール・Claude 使用効率化 |
+| `rules/` | コーディングスタイル・テスト・セキュリティ・エージェント運用ルール・Claude 使用効率化・ループ自走の安全運用 |
 | `skills/` | 参照スキル（git-workflow, tdd-workflow, security-review） |
 | `docs/` | 要件定義・アーキテクチャ・ADR |
 | `settings.json.template` | Claude Code 設定テンプレート（パス自動解決・プラグイン有効化を含む） |
