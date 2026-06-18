@@ -49,6 +49,9 @@ Launch 3 agents in parallel:
 First agent 1, then agent 2, then agent 3
 ```
 
+> Read-only fan-out (above) shares the working tree. Concurrent **writers** must each
+> run in an isolated worktree — see `rules/parallel-worktree.md`.
+
 ## Multi-Perspective Analysis
 
 For complex problems, use split role sub-agents:
