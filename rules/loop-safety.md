@@ -59,3 +59,24 @@ Example: `/goal all tests in tests/auth pass and lint is clean, or stop after 15
 - Multi-agent fan-out can cost ~15x a single chat. Prefer the smallest fleet that
   covers the work, and report what was intentionally skipped — silent truncation
   reads as "covered everything" when it wasn't.
+
+## Gated multi-phase autonomous runs (`/autorun`)
+
+When `/autorun` runs a full pipeline (requirements → … → deploy/PR) per
+`rules/autorun-flow.md`, this rule applies:
+
+- **Gates (kind=gate)** = requirements, design, PR, deploy. These are the concrete
+  application of "irreversible/outward-facing actions need confirmation" (PR/deploy)
+  and "no machine test → keep a human" (requirements/design). Non-gate phases auto-connect.
+- **Stop only on the whitelist**: gates / hard stop / per-phase retry cap / goal reached /
+  startup precondition-or-verifiability failure / irreversible-op confirmation /
+  unrecoverable error. Stopping anywhere else is a definition violation — detect and report it.
+- **Hard stop is two-layer**: a per-phase budget (e.g. verify = 5 rounds) AND a whole-run
+  budget (transition count + the session ceiling above). Either one triggers a stop.
+- **Goal drift is two-layer**: structural (reached `goal_phase` as planned) AND content
+  (each phase output maps to the confirmed requirement). Phase progress alone is NOT proof
+  of non-drift.
+- **Physical-layer scope (don't overstate)**: hooks (`pr-base-checker.py`,
+  `git-destructive-blocker.py`) only fire on git/Bash-routed push/PR — NOT on deploy
+  commands or MCP-routed push/PR. So push/PR must go through `gh` CLI (Bash); deploy's stop
+  is gate + procedure only (no physical layer).
