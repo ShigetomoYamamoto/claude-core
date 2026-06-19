@@ -1,8 +1,10 @@
 # ADR-005: GitHub PAT は OS 標準の Keychain / Keyring で管理する
 
-**ステータス**: accepted
+**ステータス**: superseded（[ADR-010](./010-official-remote-github-mcp.md) により置き換え。2026-06-19）
 
 **日付**: 2026-05-21
+
+> **注記（2026-06-19）**: 公式リモート GitHub MCP（OAuth）への移行で PAT 自体が不要になったため、本 ADR は ADR-010 に置き換えられた。以下は当時の判断の記録。
 
 ## コンテキスト
 

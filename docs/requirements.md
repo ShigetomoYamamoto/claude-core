@@ -144,35 +144,25 @@
 | 項目 | 内容 |
 |---|---|
 | 対応 OS | macOS / Linux（Windows は対象外） |
-| Linux | GUI 環境前提（`secret-tool` / libsecret 利用） |
 | パス区切り文字 | フォワードスラッシュ前提 |
-| 必須ツール最低バージョン | Python 3.8+ / git 2.0+ / Docker 20.0+（推奨）。bash 3.2+ は `setup.sh` ラッパー用（`python3 install.py` を直接呼べば不要） |
+| 必須ツール最低バージョン | Python 3.8+ / git 2.0+。bash 3.2+ は `setup.sh` ラッパー用（`python3 install.py` を直接呼べば不要） |
 
 ### セキュリティ
 
 | 項目 | 内容 |
 |---|---|
 | シークレット混入防止 | `.gitignore` + `secret-detection.py` hook + `/commit` 内で再チェック |
-| GitHub PAT 管理 | macOS Keychain / Linux libsecret 経由 |
-| PAT 運用ルール | Fine-grained PAT・有効期限 30〜90 日・最小スコープ |
+| GitHub MCP 認証 | 公式ホスト版リモートサーバー（`https://api.githubcopilot.com/mcp/`）+ OAuth。`mcp.json` には URL のみ・トークンは含めない（[ADR-010](./adr/010-official-remote-github-mcp.md)）|
+| トークン保管 | OAuth トークンは Claude Code が管理。dotfiles・環境変数にシークレットを残さない |
 | 禁止事項 | `.git/config` への直書き |
 | hook の外部通信 | 禁止（ローカル処理のみ） |
 
-#### macOS 手順
+#### GitHub MCP の認証手順
 
-```bash
-security add-generic-password -a "$USER" -s "github-pat" -w "ghp_xxxx"
-# ~/.zprofile に追記
-export GITHUB_PERSONAL_ACCESS_TOKEN="$(security find-generic-password -a "$USER" -s "github-pat" -w)"
+`setup.sh` 実行後、Claude Code 内で OAuth 認証する（PAT・Keychain 登録は不要）。
+
 ```
-
-#### Linux 手順
-
-```bash
-sudo apt install libsecret-tools  # または sudo dnf install libsecret
-secret-tool store --label="github-pat" service github-pat
-# ~/.zprofile に追記
-export GITHUB_PERSONAL_ACCESS_TOKEN="$(secret-tool lookup service github-pat)"
+/mcp        # GitHub を選び、ブラウザで OAuth 認証
 ```
 
 ### 保守性
@@ -220,8 +210,8 @@ export GITHUB_PERSONAL_ACCESS_TOKEN="$(secret-tool lookup service github-pat)"
 
 | 項目 | 内容 |
 |---|---|
-| 必須ツール | Python 3.8+ / git 2.0+ / Docker 20.0+。bash 3.2+ は `setup.sh` ラッパー用（任意） |
-| 対応 OS | macOS / Linux（GUI 環境前提・Windows 非対応） |
+| 必須ツール | Python 3.8+ / git 2.0+。bash 3.2+ は `setup.sh` ラッパー用（任意） |
+| 対応 OS | macOS / Linux（Windows 非対応） |
 | Claude Code 規約 | `~/.claude/` ディレクトリ構造に準拠 |
 | 日本語話者前提 | commands は日本語、コミットメッセージ description も日本語 |
 | ユーザー数 | 個人利用（将来チーム化を想定） |

@@ -200,11 +200,8 @@ import json, os
 # 検出結果に応じて追加するサーバーを構築（不要なものは除く）
 new_servers = {
     "github": {
-        "type": "stdio",
-        "command": "docker",
-        "args": ["run", "-i", "--rm", "-e", "GITHUB_PERSONAL_ACCESS_TOKEN",
-                 "ghcr.io/github/github-mcp-server"],
-        "env": {}
+        "type": "http",
+        "url": "https://api.githubcopilot.com/mcp/"
     },
     # playwright が依存にある場合は追加:
     # "playwright": {

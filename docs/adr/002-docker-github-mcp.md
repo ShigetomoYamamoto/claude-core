@@ -1,8 +1,10 @@
 # ADR-002: GitHub MCP は Docker 経由で起動する
 
-**ステータス**: accepted
+**ステータス**: superseded（[ADR-010](./010-official-remote-github-mcp.md) により置き換え。2026-06-19）
 
 **日付**: 2026-05-21
+
+> **注記（2026-06-19）**: GitHub が公式ホスト版リモート MCP サーバー（OAuth）を提供したため、Docker + PAT 方式は ADR-010 に置き換えられた。以下は当時の判断の記録。
 
 ## コンテキスト
 

@@ -125,11 +125,6 @@ def preflight():
     else:
         fail("git が見つかりません（2.0 以上が必要）")
 
-    if shutil.which("docker"):
-        ok("docker: 検出")
-    else:
-        warn("docker が見つかりません。GitHub MCP には Docker が必要です（macOS は brew install --cask docker）。")
-
 
 # ─────────────────────────────────────────────────────────────
 # Step 2: symlink static dirs

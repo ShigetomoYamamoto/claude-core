@@ -78,55 +78,22 @@ Claude Code のグローバル設定を管理する dotfiles リポジトリ。
 | python3 | 3.8+ | `install.py`（インストーラ本体）と hook 用 |
 | bash | 3.2+ | `setup.sh` ラッパー用（`python3 install.py` を直接呼べば不要） |
 | git | 2.0+ | |
-| Docker | 20.0+ | GitHub MCP 用（推奨） |
 
-対応 OS: macOS / Linux（GUI 環境前提・Windows 非対応）
+対応 OS: macOS / Linux（Windows 非対応）
 
-#### Docker のインストール
+> GitHub MCP は**公式ホスト版リモートサーバー（`https://api.githubcopilot.com/mcp/`・OAuth）**を利用します。Docker や Personal Access Token（PAT）は不要です（[ADR-010](./docs/adr/010-official-remote-github-mcp.md)）。
 
-```bash
-# macOS
-brew install --cask docker
-open -a Docker  # Docker Desktop を起動
+#### GitHub MCP の認証（OAuth）
 
-# Linux
-# 公式ドキュメント参照: https://docs.docker.com/engine/install/
+`mcp.json` には URL のみが書かれており（トークンは含まれない）、`setup.sh` 実行後に Claude Code 内で OAuth 認証します。
+
+```
+/mcp        # GitHub を選び、ブラウザで OAuth 認証する
 ```
 
-#### GitHub Personal Access Token の設定
+トークンは Claude Code が安全に保管するため、dotfiles にも環境変数にもシークレットは残りません。
 
-PAT は OS 標準の Keychain / Keyring に保存し、`~/.zprofile` で環境変数に展開する方式を採用します。シェル設定ファイル（dotfiles）にトークンを残さないためです。
-
-**macOS**
-
-```bash
-security add-generic-password -a "$USER" -s "github-pat" -w "ghp_xxxx"
-```
-
-`~/.zprofile` に追記：
-
-```bash
-export GITHUB_PERSONAL_ACCESS_TOKEN="$(security find-generic-password -a "$USER" -s "github-pat" -w)"
-```
-
-**Linux（GUI 環境前提）**
-
-```bash
-sudo apt install libsecret-tools   # または sudo dnf install libsecret
-secret-tool store --label="github-pat" service github-pat
-```
-
-`~/.zprofile` に追記：
-
-```bash
-export GITHUB_PERSONAL_ACCESS_TOKEN="$(secret-tool lookup service github-pat)"
-```
-
-**運用ルール**
-
-- **Fine-grained PAT** を使い、必要なリポジトリ・スコープのみに限定する
-- **有効期限を 30〜90 日** に設定して定期的にローテーションする
-- `.git/config` に `username:token@` 形式で直書きしない（混入したら即除去）
+> **既存マシン（旧 Docker 方式から移行する場合）**: `install.py` の MCP マージは「不足分のみ追加」なので、`~/.claude.json` に残る旧 `GitHub`（docker）エントリは自動では置き換わりません。`claude mcp remove GitHub` で旧定義を消してから `./setup.sh` を再実行する（または `~/.claude.json` の該当エントリを手動で書き換える）と新方式に切り替わります。不要になった Keychain の `github-pat` と `~/.zprofile` の `GITHUB_PERSONAL_ACCESS_TOKEN` も削除して構いません。
 
 ### インストール
 
@@ -145,7 +112,7 @@ cd ~/dotfiles/claude-config
 
 以下を行います：
 
-1. **preflight check** — 必須ツール（python3・git・docker）の確認
+1. **preflight check** — 必須ツール（python3・git）の確認
 2. `agents/`, `commands/`, `hooks/`, `rules/`, `skills/`, `workflows/` を `~/.claude/` に **シンボリックリンク**（repo を編集すれば即 live に反映。実体ディレクトリがあれば `~/.claude/.backup/` に退避してからリンク化）
 3. `settings.json` を **構造マージ**（下記）。`settings.json.template` のパスを解決して反映するが、**既存の設定は決して破壊しない**
 4. `mcp.json` の MCP サーバー設定を `~/.claude.json` にマージ（既存は保持、不足分のみ追加）
