@@ -25,7 +25,7 @@ different start/goal parameters.
 | plan | planner | auto | the plan has file paths and ordered steps | tdd | tdd |
 | tdd | `skills/loop-engineering/` (delegated to the micro layer) | auto | tests/lint/typecheck pass and coverage 80%+ (measured via Bash) | verify | verify |
 | verify | `/review-loop` (delegated) | auto | reviewer returns NO_ISSUES and mechanical checks pass | commit | commit |
-| commit | `/commit` | auto (※) | code-reviewer CRITICAL/HIGH=0 and secret-detection passes | pr | pr |
+| commit | `/commit-commands:commit` | auto (※) | code-reviewer CRITICAL/HIGH=0 and secret-detection passes | pr | pr |
 | pr | `/create-pr` | **gate** | human approves the PR (push/PR via gh) | migrate | (goal) |
 | migrate | `/migrate` | auto (destructive changes confirmed) | migration succeeds | deploy | — |
 | deploy | `/deploy` | **gate** | human approves the deploy | (goal) | — |

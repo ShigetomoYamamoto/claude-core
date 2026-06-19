@@ -36,10 +36,10 @@ description: |
 
 ## 不可逆操作
 
-- このループ内では commit / push を行わない。終了後に通常の `/commit` → `/create-pr` へ渡す。
+- このループ内では commit / push を行わない。終了後に通常の `/commit-commands:commit` → `/create-pr` へ渡す。
 
 ## 関連
 
 - `rules/loop-safety.md` — ハードストップとゴールドリフト対策（前提の唯一の正）
 - `rules/memory.md` — 2回出た指摘は memory に昇格させ再発を止める
-- `agents/code-reviewer.md` / `agents/security-reviewer.md` — 検出・検証に使うエージェント
+- `code-reviewer`（公式 `pr-review-toolkit` プラグイン）/ `agents/security-reviewer.md`（自作・維持）— 検出・検証に使うエージェント
