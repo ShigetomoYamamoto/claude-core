@@ -5,6 +5,14 @@ The outer loop is what makes the *next* run start smarter. Agents forget between
 sessions; the repository does not. Write durable lessons down so they survive context
 resets.
 
+> **Mechanism = official auto-memory.** Claude Code now ships a built-in memory system:
+> it stores one fact per file under the project's `memory/` dir with frontmatter,
+> keeps a `MEMORY.md` index, auto-loads it at session start, and recalls relevant
+> entries. **Do not hand-roll the file format, index, or recall** — the official
+> system already specifies and runs it (its instructions are injected each session).
+> This rule covers only the *judgment* the official prompt does not: **what** is worth
+> persisting and **when** to write it in an autonomous loop.
+
 ## What to write
 
 Persist a memory when something would otherwise have to be re-learned:
@@ -25,8 +33,9 @@ If asked to remember something the repo already records, capture only what was
 
 ## How to write
 
-- One memory = one file under `memory/`, named in kebab-case.
-- Add a one-line pointer in `MEMORY.md` (the index): `- [Title](file.md) — hook`.
+Follow the official auto-memory format (the session prompt is authoritative). The
+points that still matter for *our* workflow:
+
 - Before saving, check for an existing file that covers it — update rather than duplicate.
 - Delete memories that turn out to be wrong.
 - Convert relative dates to absolute ("today" -> the actual date).
