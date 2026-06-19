@@ -45,6 +45,10 @@
           {
             "type": "command",
             "command": "python3 __HOME__/.claude/hooks/mass-delete-blocker.py"
+          },
+          {
+            "type": "command",
+            "command": "python3 __HOME__/.claude/hooks/git-add-secret-blocker.py"
           }
         ]
       }

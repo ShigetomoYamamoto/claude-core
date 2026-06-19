@@ -23,7 +23,7 @@ Claude Code のグローバル設定を管理する dotfiles リポジトリ。
 |---|---|
 | `agents/` | 17体のカスタムエージェント（architect, planner, tdd-guide, code-reviewer, reviewer, fixer, requirements-analyst, deploy-runner など） |
 | `commands/` | 26個のスラッシュコマンド（/requirements, /design, /plan, /tdd, /commit, /deploy, /autorun, /review-loop, /verify-loop など） |
-| `hooks/` | 品質ガード・安全装置（シークレット検出・doc 生成ブロック・保護ブランチ編集ガード・git 破壊操作ブロック・PR base チェック・大量削除確認） |
+| `hooks/` | 品質ガード・安全装置（シークレット検出・秘匿ファイルのステージ防止・doc 生成ブロック・保護ブランチ編集ガード・git 破壊操作ブロック・PR base チェック・大量削除確認） |
 | `rules/` | コーディングスタイル・テスト・セキュリティ・エージェント運用ルール・Claude 使用効率化・自走/並列/メモリのループ運用ルール |
 | `skills/` | 参照スキル（loop-engineering, 3-line-contract, git-workflow, tdd-workflow, security-review） |
 | `workflows/` | オーケストレーション用 Workflow テンプレート（loop-engineering-large-A: 大規模Aの計画→赤確認→実装→検証） |
@@ -65,7 +65,7 @@ Claude Code のグローバル設定を管理する dotfiles リポジトリ。
 - `Bash(git *)` / `Bash(gh *)` — どのプロジェクトでも git/gh 操作が確認なしで動作
 - `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS: 1` — 複数エージェントの並列実行を有効化
 - `enabledPlugins` — Slack プラグインを自動有効化
-- フック: PreToolUse（保護ブランチ編集ガード・doc 生成ブロック・git 破壊操作ブロック・PR base チェック・大量削除確認）、PostToolUse（シークレット検出）、Stop / PermissionRequest（音声通知）
+- フック: PreToolUse（保護ブランチ編集ガード・doc 生成ブロック・秘匿ファイルのステージ防止・git 破壊操作ブロック・PR base チェック・大量削除確認）、PostToolUse（シークレット検出）、Stop / PermissionRequest（音声通知）
 
 ## 新しいマシンへのインストール
 
