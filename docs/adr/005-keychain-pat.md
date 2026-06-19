@@ -1,10 +1,10 @@
 # ADR-005: GitHub PAT は OS 標準の Keychain / Keyring で管理する
 
-**ステータス**: superseded（[ADR-010](./010-official-remote-github-mcp.md) により置き換え。2026-06-19）
+**ステータス**: accepted（[ADR-011](./011-official-github-plugin.md) により再有効化。2026-06-19）
 
 **日付**: 2026-05-21
 
-> **注記（2026-06-19）**: 公式リモート GitHub MCP（OAuth）への移行で PAT 自体が不要になったため、本 ADR は ADR-010 に置き換えられた。以下は当時の判断の記録。
+> **経緯（2026-06-19）**: 一時 [ADR-010](./010-official-remote-github-mcp.md)（公式リモート + OAuth）で PAT 自体が不要になるとして superseded にしたが、その OAuth は DCR 非対応で成立しなかった。代わりに採用した公式 `github` プラグイン（[ADR-011](./011-official-github-plugin.md)）が `Authorization: Bearer ${GITHUB_PERSONAL_ACCESS_TOKEN}` を使うため PAT が再び必要になり、本 ADR（Keychain / Keyring での PAT 管理）を再有効化した。
 
 ## コンテキスト
 
@@ -64,4 +64,5 @@ export GITHUB_PERSONAL_ACCESS_TOKEN="$(secret-tool lookup service github-pat)"
 ## 関連
 
 - 要件定義: `docs/requirements.md` セクション「セキュリティ」
-- 関連 ADR: ADR-002（Docker 経由 GitHub MCP）
+- 再有効化の経緯: [ADR-011](./011-official-github-plugin.md)（公式 `github` プラグイン採用で PAT が再び必要に）
+- 関連 ADR: [ADR-002](./002-docker-github-mcp.md)（Docker 経由 GitHub MCP・現在は不採用）

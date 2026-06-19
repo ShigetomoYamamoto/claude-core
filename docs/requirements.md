@@ -152,18 +152,17 @@
 | 項目 | 内容 |
 |---|---|
 | シークレット混入防止 | `.gitignore` + `secret-detection.py` hook + `/commit` 内で再チェック |
-| GitHub MCP 認証 | 公式ホスト版リモートサーバー（`https://api.githubcopilot.com/mcp/`）+ OAuth。`mcp.json` には URL のみ・トークンは含めない（[ADR-010](./adr/010-official-remote-github-mcp.md)）|
-| トークン保管 | OAuth トークンは Claude Code が管理。dotfiles・環境変数にシークレットを残さない |
-| 禁止事項 | `.git/config` への直書き |
+| GitHub MCP 認証 | 公式 `github` プラグイン（リモートサーバー + `Authorization: Bearer ${GITHUB_PERSONAL_ACCESS_TOKEN}`）。`mcp.json` では管理しない（[ADR-011](./adr/011-official-github-plugin.md)）|
+| トークン保管 | PAT は OS の Keychain / Keyring に保管し `~/.zprofile` で env 変数へ展開。dotfiles にシークレットを残さない（[ADR-005](./adr/005-keychain-pat.md)）|
+| 禁止事項 | `.git/config` への直書き・`mcp.json` / 設定ファイルへの PAT 直書き |
 | hook の外部通信 | 禁止（ローカル処理のみ） |
 
-#### GitHub MCP の認証手順
+#### GitHub MCP のセットアップ手順
 
-`setup.sh` 実行後、Claude Code 内で OAuth 認証する（PAT・Keychain 登録は不要）。
+1. PAT を Keychain / Keyring に保管し `~/.zprofile` で `GITHUB_PERSONAL_ACCESS_TOKEN` へ展開する（[ADR-005](./adr/005-keychain-pat.md)）
+2. Claude Code 内で `/plugin` から公式 `github` プラグインを導入する（プラグインが env 変数を読む）
 
-```
-/mcp        # GitHub を選び、ブラウザで OAuth 認証
-```
+> OAuth 直結は GitHub 側が DCR 非対応のため不成立（[ADR-011](./adr/011-official-github-plugin.md)）。`install.py` はプラグインに関与しない。
 
 ### 保守性
 
