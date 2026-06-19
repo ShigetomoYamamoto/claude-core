@@ -21,11 +21,11 @@ Claude Code のグローバル設定を管理する dotfiles リポジトリ。
 
 | ディレクトリ/ファイル | 内容 |
 |---|---|
-| `agents/` | 17体のカスタムエージェント（architect, planner, tdd-guide, code-reviewer, reviewer, fixer, requirements-analyst, deploy-runner など） |
-| `commands/` | 26個のスラッシュコマンド（/requirements, /design, /plan, /tdd, /commit, /deploy, /autorun, /review-loop, /verify-loop など） |
+| `agents/` | 16体のカスタムエージェント（architect, planner, tdd-guide, reviewer, fixer, requirements-analyst, deploy-runner など）。コードレビューは公式 `pr-review-toolkit` に委譲（[ADR-012](./docs/adr/012-official-plugins-for-git-review-security.md)） |
+| `commands/` | 23個のスラッシュコマンド（/requirements, /design, /plan, /tdd, /create-pr, /deploy, /autorun, /review-loop, /verify-loop など）。コミット/ブランチ掃除は公式 `commit-commands` に委譲 |
 | `hooks/` | 品質ガード・安全装置（シークレット検出・秘匿ファイルのステージ防止・doc 生成ブロック・保護ブランチ編集ガード・git 破壊操作ブロック・PR base チェック・大量削除確認） |
 | `rules/` | コーディングスタイル・テスト・セキュリティ・エージェント運用ルール・Claude 使用効率化・自走/並列/メモリのループ運用ルール |
-| `skills/` | 参照スキル（loop-engineering, 3-line-contract, git-workflow, tdd-workflow, security-review） |
+| `skills/` | 参照スキル（loop-engineering, 3-line-contract, git-workflow）。TDD は `rules/testing.md`＋`/tdd`、セキュリティは公式 `security-guidance`＋`rules/security.md` に集約 |
 | `workflows/` | オーケストレーション用 Workflow テンプレート（loop-engineering-large-A: 大規模Aの計画→赤確認→実装→検証） |
 | `docs/` | 要件定義・アーキテクチャ・ADR |
 | `settings.json.template` | Claude Code 設定テンプレート（パス自動解決・プラグイン有効化を含む。構造マージのベース） |
@@ -66,8 +66,8 @@ Claude Code のグローバル設定を管理する dotfiles リポジトリ。
 - `defaultMode: auto` — ほとんどの操作を自動承認
 - `Bash(git *)` / `Bash(gh *)` — どのプロジェクトでも git/gh 操作が確認なしで動作
 - `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS: 1` — 複数エージェントの並列実行を有効化
-- `enabledPlugins` — Slack プラグインを自動有効化
-- フック: PreToolUse（保護ブランチ編集ガード・doc 生成ブロック・秘匿ファイルのステージ防止・git 破壊操作ブロック・PR base チェック・大量削除確認）、PostToolUse（シークレット検出）、Stop / PermissionRequest（音声通知）
+- `enabledPlugins` — Slack・`commit-commands`・`pr-review-toolkit`・`security-guidance` プラグインを自動有効化（[ADR-012](./docs/adr/012-official-plugins-for-git-review-security.md)）
+- フック: PreToolUse（保護ブランチ編集ガード・doc 生成ブロック・秘匿ファイルのステージ防止・git 破壊操作ブロック・PR base チェック・大量削除確認・コミットメッセージ規約チェック）、PostToolUse（シークレット検出）、Stop / PermissionRequest（音声通知）
 
 ## 新しいマシンへのインストール
 
@@ -173,7 +173,7 @@ cd ~/dotfiles/claude-config
 - `ログイン時のエラーが表示されないバグを直して` — 具体タスクでも可
 
 > **関門でのみ止まります**（全自動＝要件・設計・PR・デプロイ／サポート＝PR）。それ以外は自動連結。
-> 各フェーズコマンド（`/requirements`・`/design`・`/plan`・`/commit`・`/create-pr` 等）は**単発でも使え**、その場合は従来どおりコマンド完了で停止して次を案内します（自動連結は autorun 文脈でのみ）。
+> 各フェーズコマンド（`/requirements`・`/design`・`/plan`・`/commit-commands:commit`・`/create-pr` 等）は**単発でも使え**、その場合は従来どおりコマンド完了で停止して次を案内します（自動連結は autorun 文脈でのみ）。
 > コード1実装だけを検証付きで回したいときは `loop-engineering` スキル（「〜を実装して」で起動）。
 
 ## 使い方
@@ -231,7 +231,7 @@ docs/02_detailed-design.md         ← /design の詳細設計
 ```
 # ステップ5: 実装開始（/autorun で自走、または個別コマンド）
 /autorun <目的>   # 関門4点(要件・設計・PR・デプロイ)以外を自動連結して自走
-# または個別に: /plan → /tdd → /commit → /create-pr → /migrate → /deploy
+# または個別に: /plan → /tdd → /commit-commands:commit → /create-pr → /migrate → /deploy
 ```
 
 ---
@@ -251,10 +251,12 @@ git pull
 | 種別 | 管理方法 |
 |---|---|
 | MCP サーバー（GitHub / Playwright / Figma） | `mcp.json` → `setup.sh` が `~/.claude.json` にマージ |
-| プラグイン（Slack） | `settings.json.template` の `enabledPlugins` で自動有効化 |
+| プラグイン（Slack / commit-commands / pr-review-toolkit / security-guidance） | `settings.json.template` の `enabledPlugins` で有効化。本体は各マシンで `/plugin` から導入 |
 
 新しい MCP サーバーを追加した場合は `mcp.json` に追記して `setup.sh` を再実行してください。  
 新しいプラグインを有効化した場合は `settings.json.template` の `enabledPlugins` に追記してください。
+
+> **公式プラグインの導入（各マシンで1回）**: `enabledPlugins` は有効化フラグで、本体は別途導入が必要です。Claude Code 内で `/plugin` を開き、`claude-plugins-official` から `commit-commands`・`pr-review-toolkit`・`security-guidance`（と `slack`）を導入してください。git/レビュー/セキュリティを公式へ寄せた背景は [ADR-012](./docs/adr/012-official-plugins-for-git-review-security.md)。コミット規約・develop ベース PR・保護ブランチ保護などの安全保証は hooks 側が担保するため、薄い公式コマンドでも規律は保たれます。
 
 ## 拡張方法
 

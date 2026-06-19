@@ -2,7 +2,7 @@
 
 ## Behavioral Rules (enforced for all agents)
 
-These rules apply whenever any agent performs git operations — not just when `/commit`, `/create-branch`, or `/create-pr` is called explicitly.
+These rules apply whenever any agent performs git operations — not just when `/commit-commands:commit`, `/create-branch`, or `/create-pr` is called explicitly.
 
 ### Commits
 - **Always show the commit message to the user and get approval before committing.** Never commit silently.
@@ -18,7 +18,7 @@ These rules apply whenever any agent performs git operations — not just when `
 ### Pull Requests
 - **Always show the PR title and description to the user and get approval before creating.**
 - Base branch is always `develop`. Never open PRs directly to `main` or `master`.
-- If there are uncommitted changes, stop and guide the user to run `/commit` first.
+- If there are uncommitted changes, stop and guide the user to run `/commit-commands:commit` first.
 - Do not push unless the PR flow requires it, and confirm before doing so.
 
 ---
@@ -26,3 +26,11 @@ These rules apply whenever any agent performs git operations — not just when `
 ## Reference
 
 Format details (Conventional Commits type table / branch naming conventions / PR description template) are documented in `~/.claude/skills/git-workflow/SKILL.md`. Refer to it when generating commit messages, branch names, or PR descriptions.
+
+## コマンドの所在（公式委譲・[ADR-012](../docs/adr/012-official-plugins-for-git-review-security.md)）
+
+- **コミット** → 公式 `/commit-commands:commit`（コミットのみ・push しない）。規約準拠は `commit-msg-convention.py` hook が機械的に担保。
+- **マージ済みローカルブランチ掃除** → 公式 `/commit-commands:clean_gone`。
+- **ブランチ作成** → 自作 `/create-branch`（develop 起点＋命名規約。公式に同等品なし）。
+- **PR 作成** → 自作 `/create-pr`（develop ベース＋テンプレ＋承認）。公式 `/commit-commands:commit-push-pr` は `--base` を指定せず `pr-base-checker.py`（develop 強制）に弾かれ、かつ無確認 push/PR になるため採用しない。
+- 上記すべてに対し、保護ブランチへの commit/push と非 develop への PR は hooks が決定的にブロックする（どのコマンド経由でも有効）。

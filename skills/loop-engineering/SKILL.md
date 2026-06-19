@@ -336,7 +336,7 @@ A-大(多ファイル/移行/重い仕様):
 - 往復回数: N / 5
 - 変更ファイル(コミットは指示待ち): src/… , test/…
 ```
-> コミット/push は**しない**(明示依頼があってから)。必要なら `/commit`(コミット) / `/create-pr`(PR作成)へ。push はユーザーが手動で行う方針(`~/.claude/rules/git-workflow.md`)。
+> コミット/push は**しない**(明示依頼があってから)。必要なら `/commit-commands:commit`(コミット) / `/create-pr`(PR作成)へ。push はユーザーが手動で行う方針(`~/.claude/rules/git-workflow.md`)。
 
 ### 上限に達した/詰まった場合(エスカレーション)
 ```markdown
@@ -375,7 +375,7 @@ A-大(多ファイル/移行/重い仕様):
 | **reviewer** | agent | 厳格コードレビュー専任(CRITICAL/HIGH か NO_ISSUES) | /review-loop が中で起動。再定義しない。 |
 | **fixer** | agent | 指摘を1件ずつ最小修正、verify で exit 0 確認 | /review-loop が中で起動。再定義しない。 |
 | **3-line-contract** | skill | 目的/出力/成功条件を 3 行に整理 | 目標が曖昧なときの前段。 |
-| **/commit ・ /create-pr** | command | コミット / PR 作成 | 完了後フロー(明示依頼があってから)。push はユーザー手動(`~/.claude/rules/git-workflow.md`)。 |
+| **/commit-commands:commit ・ /create-pr** | command | コミット(公式) / PR 作成(自作) | 完了後フロー(明示依頼があってから)。push はユーザー手動(`~/.claude/rules/git-workflow.md`)。 |
 | **testing.md / answer-only.md** | グローバル方針 | レッド→グリーン/ミューテーション、明示依頼まで読み取り専用 | STEP 4 と全体の前提として従う。 |
 | **rules/loop-safety.md** | グローバル方針 | 自走の安全規律(ハードストップ・ゴールドリフト・不可逆操作確認)の正本 | 往復上限・破壊的操作確認の数値の正本。本スキルが参照(独立した二重ブレーキ)。 |
 | **rules/memory.md** | グローバル方針 | ラン間学習(2回出た指摘を memory に昇格) | 同じ指摘の再発防止(アウターループ)。 |

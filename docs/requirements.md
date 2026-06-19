@@ -45,10 +45,10 @@
 | リファクタ | `/refactor-clean` | refactor-cleaner |
 | テスト補完 | `/test-coverage` | tdd-guide |
 | E2E | `/e2e` | e2e-runner |
-| レビュー | `/code-review` | code-reviewer |
-| セキュリティレビュー | （自動起動） | security-reviewer |
-| コミット | `/commit` | — |
-| PR作成 | `/create-pr` | — |
+| レビュー | 公式 `pr-review-toolkit` / `code-review` | code-reviewer（公式） |
+| セキュリティレビュー | 公式 `security-guidance`（hook）＋（自動起動） | security-reviewer（自作・維持） |
+| コミット | `/commit-commands:commit`（公式） | — |
+| PR作成 | `/create-pr`（自作・維持） | — |
 | マイグレーション | `/migrate` | migration-runner |
 | デプロイ（検証・自動ロールバック込み） | `/deploy` | deploy-runner |
 | 手動ロールバック | `/rollback` | rollback-runner |
@@ -59,7 +59,7 @@
 | 自走（フロー全体） | `/autorun`（関門4点以外を自動連結） | autorun-flow に従い各フェーズへ連結 |
 | コード実装の自走 | loop-engineering スキル | reviewer / fixer |
 | レビュー→修正ループ | `/review-loop`・`/review-loop-cross`・`/review-loop-cross-path` | reviewer / fixer |
-| 検証ゲート（反証検証） | `/verify-loop` | code-reviewer / security-reviewer |
+| 検証ゲート（反証検証） | `/verify-loop` | code-reviewer（公式 pr-review-toolkit）/ security-reviewer（自作） |
 
 #### 保留（将来追加候補）
 
@@ -75,8 +75,8 @@
 |---|---|
 | テストカバレッジ 80% 以上の強制 | グローバル（`rules/testing.md`） |
 | TDD 強制 | グローバル（`/tdd` + tdd-guide） |
-| コードレビュー | グローバル（`/code-review` + code-reviewer） |
-| セキュリティレビュー | グローバル（security-reviewer） |
+| コードレビュー | グローバル（公式 `pr-review-toolkit` の code-reviewer。[ADR-012](./adr/012-official-plugins-for-git-review-security.md)） |
+| セキュリティレビュー | グローバル（公式 `security-guidance` hook ＋ 自作 security-reviewer） |
 | コーディングスタイル | グローバル（`rules/coding-style.md`・言語非依存に修正） |
 | Claude 使用効率化 | グローバル（`rules/claude-efficiency.md`） |
 | ビルド・型エラー修正 | グローバル（`/build-fix` + build-error-resolver） |
@@ -89,7 +89,7 @@
 
 | 項目 | 配置 |
 |---|---|
-| シークレット検出 | グローバル hook（`secret-detection.py`）+ `/commit` 内で再チェック |
+| シークレット検出 | グローバル hook（`secret-detection.py` / `git-add-secret-blocker.py`）＋ 公式 `security-guidance`（commit 時 LLM レビュー） |
 | 不要ドキュメント生成のブロック | グローバル hook（`doc-blocker.py`） |
 | git 破壊的操作の防止 | グローバル hook（新規・`git push --force` / `reset --hard` / `clean -fd`） |
 | 大量ファイル削除確認 | グローバル hook（新規） |
@@ -151,7 +151,7 @@
 
 | 項目 | 内容 |
 |---|---|
-| シークレット混入防止 | `.gitignore` + `secret-detection.py` hook + `/commit` 内で再チェック |
+| シークレット混入防止 | `.gitignore` + `secret-detection.py` / `git-add-secret-blocker.py` hook + 公式 `security-guidance`（commit 時 LLM レビュー） |
 | GitHub MCP 認証 | 公式 `github` プラグイン（リモートサーバー + `Authorization: Bearer ${GITHUB_PERSONAL_ACCESS_TOKEN}`）。`mcp.json` では管理しない（[ADR-011](./adr/011-official-github-plugin.md)）|
 | トークン保管 | PAT は OS の Keychain / Keyring に保管し `~/.zprofile` で env 変数へ展開。dotfiles にシークレットを残さない（[ADR-005](./adr/005-keychain-pat.md)）|
 | 禁止事項 | `.git/config` への直書き・`mcp.json` / 設定ファイルへの PAT 直書き |
