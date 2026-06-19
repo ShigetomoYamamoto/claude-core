@@ -34,6 +34,8 @@ These agents MUST be invoked automatically — without waiting for the user to a
 | Manual rollback needed after a previous deploy | **rollback-runner** — revert to a previous version |
 | PR has reviewer comments that need addressing | **review-responder** — implement requested changes and reply |
 
+> 自走時（`/autorun`）は `rules/autorun-flow.md` の遷移に従い、各エージェントがフェーズとして連結起動される（requirements→requirements-analyst, analyze-task→task-analyst, design→architect, plan→planner, tdd→loop-engineering, verify→/review-loop, deploy→deploy-runner 等）。上表のトリガー（コード変更時の即時レビュー等）はフェーズ内でなお有効。
+
 ## Parallel Task Execution
 
 ALWAYS use parallel Task execution for independent operations:
@@ -48,6 +50,9 @@ Launch 3 agents in parallel:
 # BAD: Sequential when unnecessary
 First agent 1, then agent 2, then agent 3
 ```
+
+> Read-only fan-out (above) shares the working tree. Concurrent **writers** must each
+> run in an isolated worktree — see `rules/parallel-worktree.md`.
 
 ## Multi-Perspective Analysis
 

@@ -9,6 +9,7 @@ These rules apply whenever any agent performs git operations — not just when `
 - Never stage `.env`, credential files, or any file matching `*.key`, `*.pem`, `*.secret`.
 - If changes span multiple unrelated purposes, split into separate commits.
 - Do not push after committing — the user pushes manually.
+- **Autonomous-run exception:** during `/autorun`, the user grants a one-time blanket approval for auto-commits at startup; per-commit approval is then waived (the message is still shown in the transcript each time). Without that approval, commit becomes a gate. See `docs/adr/008-orchestration-declarative-flow.md`.
 
 ### Branches
 - **Always branch from `develop`.** Pull the latest `develop` before creating any branch.

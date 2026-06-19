@@ -21,14 +21,43 @@ Claude Code のグローバル設定を管理する dotfiles リポジトリ。
 
 | ディレクトリ/ファイル | 内容 |
 |---|---|
-| `agents/` | 15体のカスタムエージェント（architect, planner, tdd-guide, code-reviewer, requirements-analyst, deploy-runner など） |
-| `commands/` | 21個のスラッシュコマンド（/requirements, /design, /plan, /tdd, /commit, /deploy, /rollback など） |
-| `hooks/` | 品質ガード・安全装置（シークレット検出・doc 生成ブロック・git 破壊操作ブロック・PR base チェック・大量削除確認） |
-| `rules/` | コーディングスタイル・テスト・セキュリティ・エージェント運用ルール・Claude 使用効率化 |
-| `skills/` | 参照スキル（git-workflow, tdd-workflow, security-review） |
+| `agents/` | 17体のカスタムエージェント（architect, planner, tdd-guide, code-reviewer, reviewer, fixer, requirements-analyst, deploy-runner など） |
+| `commands/` | 26個のスラッシュコマンド（/requirements, /design, /plan, /tdd, /commit, /deploy, /autorun, /review-loop, /verify-loop など） |
+| `hooks/` | 品質ガード・安全装置（シークレット検出・doc 生成ブロック・保護ブランチ編集ガード・git 破壊操作ブロック・PR base チェック・大量削除確認） |
+| `rules/` | コーディングスタイル・テスト・セキュリティ・エージェント運用ルール・Claude 使用効率化・自走/並列/メモリのループ運用ルール |
+| `skills/` | 参照スキル（loop-engineering, 3-line-contract, git-workflow, tdd-workflow, security-review） |
+| `workflows/` | オーケストレーション用 Workflow テンプレート（loop-engineering-large-A: 大規模Aの計画→赤確認→実装→検証） |
 | `docs/` | 要件定義・アーキテクチャ・ADR |
 | `settings.json.template` | Claude Code 設定テンプレート（パス自動解決・プラグイン有効化を含む） |
 | `mcp.json` | MCP サーバー設定（GitHub / Playwright / Figma） |
+
+## ループ自走（Loop Engineering）運用
+
+目的を渡せば検証しながら自走する仕組みを、安全装置（`rules/loop-safety.md`）を核に、5層で備えています。
+
+| 層 | 主な成果物 | 役割 |
+|----|-----------|------|
+| **ミクロ実装** | `skills/loop-engineering/`・`commands/review-loop`（+`reviewer`/`fixer`）・`workflows/loop-engineering-large-A.js` | 1タスクを VISION→テスト→レッド/グリーン→レビュー往復→完了判定で完成させる（強さ A/B/C を自動選択） |
+| **マクロ自走** | `rules/autorun-flow`（遷移定義）・`commands/autorun`（解釈）・`docs/adr/007`・`008` | 要件→設計→実装→PR/デプロイを、関門4点（要件・設計・PR・デプロイ）以外を autorun-flow の遷移表に従い自動連結 |
+| **安全（横串）** | `rules/loop-safety.md` | 前提条件・ハードストップ・ゴールドリフト・不可逆操作確認（全層が参照する正本） |
+| **メモリ（横串）** | `rules/memory.md` | セッションを跨ぐ学習を `memory/` に書き戻す（アウターループ） |
+| **並列（横串）** | `rules/parallel-worktree.md` | 並列エージェントが書き込み競合する場合の worktree 分離 |
+
+**安全の原則:** ブレーキ（ハードストップ・専用ブランチ・機械的な成功判定）を先に設定してから自走させる。機械的に成功判定できないタスクは自走させない。
+
+**典型的な使い方:**
+
+```
+# 1つのコード実装をクローズドループで完成（ミクロ）
+「〜を実装して」と頼むと loop-engineering スキルが強さ A/B/C を自動選択
+
+# 完了条件までフロー全体を自走（マクロ・上限つき）
+/autorun tests/ が全 pass し ruff がクリーンになるまで（最大15ターン）
+
+# レビュー→修正を指摘0まで自律で回す
+/review-loop      # 通常（Claude が reviewer/fixer を回す）
+/verify-loop      # 反証検証つき（自走フローの検証ゲート）
+```
 
 ## settings.json.template の主な設定
 
@@ -36,7 +65,7 @@ Claude Code のグローバル設定を管理する dotfiles リポジトリ。
 - `Bash(git *)` / `Bash(gh *)` — どのプロジェクトでも git/gh 操作が確認なしで動作
 - `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS: 1` — 複数エージェントの並列実行を有効化
 - `enabledPlugins` — Slack プラグインを自動有効化
-- フック: PreToolUse（doc 生成ブロック・git 破壊操作ブロック・PR base チェック・大量削除確認）、PostToolUse（シークレット検出）、Stop 音声通知
+- フック: PreToolUse（保護ブランチ編集ガード・doc 生成ブロック・git 破壊操作ブロック・PR base チェック・大量削除確認）、PostToolUse（シークレット検出）、Stop / PermissionRequest（音声通知）
 
 ## 新しいマシンへのインストール
 
@@ -108,7 +137,7 @@ cd ~/dotfiles/claude-config
 `setup.sh` は以下を行います：
 
 1. **preflight check** — 必須ツール（bash・python3・git・docker）のバージョン確認
-2. `agents/`, `commands/`, `hooks/`, `rules/`, `skills/` を `~/.claude/` にコピー
+2. `agents/`, `commands/`, `hooks/`, `rules/`, `skills/`, `workflows/` を `~/.claude/` にコピー
 3. `settings.json.template` からパスを解決して `~/.claude/settings.json` を生成
 4. `mcp.json` の MCP サーバー設定を `~/.claude.json` にマージ（既存設定は保持し、不足分のみ追加）
 
@@ -116,34 +145,32 @@ cd ~/dotfiles/claude-config
 
 ## 開発フロー
 
-Claude Code は2つのモードで開発を進めます。どちらも日本語で話しかけるか、コマンドで明示的に起動できます。
+目的を渡すと `/autorun` が `rules/autorun-flow.md` の遷移に従い、**関門4点（要件確定・設計確定・PR作成・デプロイ）以外を自動連結**して自走します。全自動／サポートの2モードは、起点とゴールの違いだけ（同じ自走エンジンのパラメータ違い）です。
 
-### 全自動モード（要件 → デプロイまで）
-
-```
-/requirements → /design → /plan → /tdd → /commit → /create-pr → /migrate → /deploy
-（要件分析）   （設計）  （計画） （テスト・実装） （コミット） （PR作成） （DB変更） （デプロイ）
-```
-
-**起動方法**
-- `ユーザーのパスワードリセット機能を作って` — 日本語で要望を伝える
-- `/requirements ユーザー認証機能を作りたい` — 明示的に起動
-
-要件・設計・コミット・PR の各ステップで確認のために止まります。
-
-### サポートモード（タスク → PR まで）
+### 全自動モード（自由形式の目標 → デプロイ）
 
 ```
-/analyze-task → /plan → /tdd → /commit → /create-pr → /respond-review
-（タスク分析） （計画） （テスト・実装） （コミット） （PR作成） （レビュー対応）
+要件 →🚦 設計 →🚦 計画 → 実装(TDD) → 検証 → コミット → PR →🚦 (migrate) → デプロイ →🚦
+🚦＝関門（人間が確認）。それ以外は自動連結。コミットは起動時の包括承認で自動。
 ```
 
 **起動方法**
-- `Issue #12 を実装して` — GitHub Issue を指定する
-- `ログイン時のエラーメッセージが表示されないバグを直して` — 具体的なタスクを伝える
-- `/analyze-task #42` — 明示的に起動
+- `/autorun ユーザーのパスワードリセット機能を作って` — 目的を渡して自走
+- `ユーザーのパスワードリセット機能を作って` — 日本語の要望でも可（要件フェーズから）
 
-途中からでも起動できます：`/design`（設計から）、`/plan`（計画から）。
+### サポートモード（具体タスク・Issue → PR）
+
+```
+タスク分析 → 計画 → 実装(TDD) → 検証 → コミット → PR →🚦
+```
+
+**起動方法**
+- `/autorun Issue #12 を実装して` — Issue を渡して自走
+- `ログイン時のエラーが表示されないバグを直して` — 具体タスクでも可
+
+> **関門でのみ止まります**（全自動＝要件・設計・PR・デプロイ／サポート＝PR）。それ以外は自動連結。
+> 各フェーズコマンド（`/requirements`・`/design`・`/plan`・`/commit`・`/create-pr` 等）は**単発でも使え**、その場合は従来どおりコマンド完了で停止して次を案内します（自動連結は autorun 文脈でのみ）。
+> コード1実装だけを検証付きで回したいときは `loop-engineering` スキル（「〜を実装して」で起動）。
 
 ## 使い方
 
@@ -198,8 +225,9 @@ docs/02_detailed-design.md         ← /design の詳細設計
 ```
 
 ```
-# ステップ5: 実装開始
-/plan → /tdd → /commit → /create-pr → /migrate → /deploy
+# ステップ5: 実装開始（/autorun で自走、または個別コマンド）
+/autorun <目的>   # 関門4点(要件・設計・PR・デプロイ)以外を自動連結して自走
+# または個別に: /plan → /tdd → /commit → /create-pr → /migrate → /deploy
 ```
 
 ---
@@ -224,7 +252,7 @@ git pull
 
 ## 拡張方法
 
-新しいエージェント・コマンド・hook・MCP を追加する手順です。追加後は他マシンで `git pull && setup.sh` を実行すれば反映されます。
+新しいエージェント・コマンド・hook・workflow・MCP を追加する手順です。追加後は他マシンで `git pull && setup.sh` を実行すれば反映されます。
 
 ### 新エージェントを追加
 
@@ -248,6 +276,12 @@ git pull
 - 予期せぬエラーは `exit 0`（Claude を止めない）
 - 意図的ブロックのみ `exit 2`
 - ネットワーク通信禁止（ローカル処理のみ）
+
+### 新 workflow を追加
+
+1. `workflows/<name>.js` を作成（Workflow ツールで起動できる JS。`meta` 必須、mode 分岐・引数バリデーションを持たせる）
+2. 起動元のスキル / コマンド（例: `skills/loop-engineering/SKILL.md`）から参照を追記
+3. コミット → 他マシンで `git pull && setup.sh`（`setup.sh` が `workflows/` を無条件コピーするため配線追加は不要）
 
 ### 新 MCP を追加
 

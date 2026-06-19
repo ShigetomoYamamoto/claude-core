@@ -15,10 +15,13 @@
 
 | フェーズ | 関与度 |
 |---|---|
-| 設計（DB・API） | Claude が作成 → 人が確認・承認 |
-| 実装・テスト | 全自動 |
-| コミット・PR | 全自動 |
-| デプロイ | 全自動 |
+| 要件確定 | 関門（人が承認） |
+| 設計確定 | 関門（人が承認。不要ならスキップ） |
+| 実装・テスト・検証・コミット | 自動連結 |
+| PR作成 | 関門（人が承認） |
+| デプロイ | 関門（人が承認） |
+
+両モードは `/autorun` が `rules/autorun-flow.md` の遷移定義に従い、**関門4点（要件・設計・PR・デプロイ）以外を自動連結**して実現する（起点・ゴールのパラメータ違い）。安全規律の正本は `rules/loop-safety.md`。
 
 ### このリポジトリの位置づけ
 
@@ -53,6 +56,10 @@
 | PR レビュー対応 | `/respond-review` | review-responder |
 | ドキュメント更新 | `/update-docs` | doc-updater |
 | コードマップ更新 | `/update-codemaps` | doc-updater |
+| 自走（フロー全体） | `/autorun`（関門4点以外を自動連結） | autorun-flow に従い各フェーズへ連結 |
+| コード実装の自走 | loop-engineering スキル | reviewer / fixer |
+| レビュー→修正ループ | `/review-loop`・`/review-loop-cross`・`/review-loop-cross-path` | reviewer / fixer |
+| 検証ゲート（反証検証） | `/verify-loop` | code-reviewer / security-reviewer |
 
 #### 保留（将来追加候補）
 
@@ -71,7 +78,7 @@
 | コードレビュー | グローバル（`/code-review` + code-reviewer） |
 | セキュリティレビュー | グローバル（security-reviewer） |
 | コーディングスタイル | グローバル（`rules/coding-style.md`・言語非依存に修正） |
-| Claude 使用効率化 | グローバル（`rules/performance.md` → リネーム予定） |
+| Claude 使用効率化 | グローバル（`rules/claude-efficiency.md`） |
 | ビルド・型エラー修正 | グローバル（`/build-fix` + build-error-resolver） |
 | デッドコード削除 | グローバル（`/refactor-clean` + refactor-cleaner） |
 | アクセシビリティチェック | プロジェクト側 |
@@ -109,7 +116,7 @@
 
 | 項目 | 内容 |
 |---|---|
-| 設定ディレクトリのコピー | `setup.sh`（`agents/` `commands/` `hooks/` `rules/` `skills/`） |
+| 設定ディレクトリのコピー | `setup.sh`（`agents/` `commands/` `hooks/` `rules/` `skills/` `workflows/`） |
 | Claude Code 設定生成 | `setup.sh`（`settings.json.template` → `~/.claude/settings.json`） |
 | MCP 設定マージ | `setup.sh`（`mcp.json` → `~/.claude.json`、不足分のみ追加） |
 | 事前検証（preflight check） | `setup.sh` に追加（必須ツールが無ければ案内して exit） |
@@ -184,7 +191,7 @@ export GITHUB_PERSONAL_ACCESS_TOKEN="$(secret-tool lookup service github-pat)"
 |---|---|
 | 新エージェント・新コマンド・新 hook の追加手順 | README に明文化 |
 | 既存の振る舞いを変えない | 新規追加は既存を壊さないこと |
-| 5レイヤー構造を固定 | Behavior / Workforce / Guardrails / Wiring / Installer |
+| レイヤー構造を固定 | Behavior / Workforce / Orchestration（workflows/） / Guardrails / Wiring / Installer |
 
 ### 観測性
 

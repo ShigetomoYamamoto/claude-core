@@ -86,7 +86,7 @@ mkdir -p "$CLAUDE_DIR"
 # ─────────────────────────────────────────────────────────────
 step "copying config directories"
 
-for dir in agents commands rules skills hooks; do
+for dir in agents commands rules skills hooks workflows; do
   if [ -d "$DOTFILES_DIR/$dir" ]; then
     rm -rf "$CLAUDE_DIR/$dir"
     cp -r "$DOTFILES_DIR/$dir" "$CLAUDE_DIR/$dir"
