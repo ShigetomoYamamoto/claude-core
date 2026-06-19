@@ -116,7 +116,6 @@ description: |
 
 | 条件 | 追加する MCP |
 |-----|------------|
-| `.github/` を生成する（ほぼ常時） | GitHub MCP |
 | `playwright` が依存にある | Playwright MCP |
 | `@supabase/` が依存にある | Supabase MCP |
 | `vercel.json` または Vercel 関連ファイルがある | Vercel MCP |
@@ -125,6 +124,7 @@ description: |
 
 | 条件 | 案内する Plugin |
 |-----|--------------|
+| `.github/` を生成する（ほぼ常時） | GitHub Plugin（公式。`/plugin` で導入し `GITHUB_PERSONAL_ACCESS_TOKEN` を設定。[ADR-011](../docs/adr/011-official-github-plugin.md)）|
 | `@supabase/` が依存にある | Supabase Plugin |
 | `vercel.json` または Vercel 関連ファイルがある | Vercel Plugin |
 | 環境変数に `SLACK_` が含まれる | Slack Plugin |
@@ -198,11 +198,8 @@ python3 << 'PYEOF'
 import json, os
 
 # 検出結果に応じて追加するサーバーを構築（不要なものは除く）
+# 注: GitHub は MCP に直書きせず、公式 `github` プラグイン（/plugin）で導入する（ADR-011）
 new_servers = {
-    "github": {
-        "type": "http",
-        "url": "https://api.githubcopilot.com/mcp/"
-    },
     # playwright が依存にある場合は追加:
     # "playwright": {
     #     "type": "stdio",

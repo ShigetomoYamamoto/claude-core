@@ -81,19 +81,37 @@ Claude Code のグローバル設定を管理する dotfiles リポジトリ。
 
 対応 OS: macOS / Linux（Windows 非対応）
 
-> GitHub MCP は**公式ホスト版リモートサーバー（`https://api.githubcopilot.com/mcp/`・OAuth）**を利用します。Docker や Personal Access Token（PAT）は不要です（[ADR-010](./docs/adr/010-official-remote-github-mcp.md)）。
+> GitHub MCP は**公式 `github` プラグイン**を利用します（`mcp.json` では管理しません）。プラグインはリモートサーバー（`https://api.githubcopilot.com/mcp/`）へ `Authorization: Bearer ${GITHUB_PERSONAL_ACCESS_TOKEN}` で接続するため、**PAT が必要**です。Docker は不要です（[ADR-011](./docs/adr/011-official-github-plugin.md)）。
 
-#### GitHub MCP の認証（OAuth）
+> **なぜ OAuth ではないのか**: 公式リモートサーバーへ OAuth 直結も試みましたが、GitHub の認可サーバーは動的クライアント登録（DCR / RFC 7591）に非対応で、Claude Code は `Incompatible auth server: does not support dynamic client registration` で接続に失敗します。公式プラグインが採る PAT ヘッダ方式が現実的な唯一の経路です（経緯は [ADR-010](./docs/adr/010-official-remote-github-mcp.md) → [ADR-011](./docs/adr/011-official-github-plugin.md)）。
 
-`mcp.json` には URL のみが書かれており（トークンは含まれない）、`setup.sh` 実行後に Claude Code 内で OAuth 認証します。
+#### GitHub MCP のセットアップ
+
+**1. PAT を Keychain / Keyring に保管し、env 変数へ展開する**（[ADR-005](./docs/adr/005-keychain-pat.md)。dotfiles にトークンを残さないため）
+
+```bash
+# macOS
+security add-generic-password -a "$USER" -s "github-pat" -w "ghp_xxxx"
+# ~/.zprofile に追記
+export GITHUB_PERSONAL_ACCESS_TOKEN="$(security find-generic-password -a "$USER" -s "github-pat" -w)"
+
+# Linux（GUI 環境前提）
+secret-tool store --label="github-pat" service github-pat
+# ~/.zprofile に追記
+export GITHUB_PERSONAL_ACCESS_TOKEN="$(secret-tool lookup service github-pat)"
+```
+
+Fine-grained PAT を使い、最小スコープ・30〜90 日のローテーションで運用します。
+
+**2. 公式プラグインを導入する**（Claude Code 内）
 
 ```
-/mcp        # GitHub を選び、ブラウザで OAuth 認証する
+/plugin     # claude-plugins-official マーケットプレイスから `github` を導入
 ```
 
-トークンは Claude Code が安全に保管するため、dotfiles にも環境変数にもシークレットは残りません。
+プラグインの `.mcp.json` が `${GITHUB_PERSONAL_ACCESS_TOKEN}` を読むため、env 変数を設定済みなら追加設定は不要です。
 
-> **既存マシン（旧 Docker 方式から移行する場合）**: `install.py` の MCP マージは「不足分のみ追加」なので、`~/.claude.json` に残る旧 `GitHub`（docker）エントリは自動では置き換わりません。`claude mcp remove GitHub` で旧定義を消してから `./setup.sh` を再実行する（または `~/.claude.json` の該当エントリを手動で書き換える）と新方式に切り替わります。不要になった Keychain の `github-pat` と `~/.zprofile` の `GITHUB_PERSONAL_ACCESS_TOKEN` も削除して構いません。
+> **既存マシンからの移行**: `~/.claude.json` に旧 `GitHub`（http・認証ヘッダなし）エントリが残っていると壊れたまま重複します。`claude mcp remove GitHub` で除去してください（GitHub MCP はプラグイン側の `github` が担います）。
 
 ### インストール
 

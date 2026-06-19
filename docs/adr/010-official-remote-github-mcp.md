@@ -1,8 +1,10 @@
 # ADR-010: GitHub MCP は公式ホスト版リモートサーバー（OAuth）を利用する
 
-**ステータス**: accepted
+**ステータス**: superseded（[ADR-011](./011-official-github-plugin.md) により置き換え。2026-06-19）
 
 **日付**: 2026-06-19
+
+> **注記（2026-06-19）**: 本 ADR の前提「Claude Code がリモート MCP の OAuth を回せる」は成立しなかった。GitHub の認可サーバー（`https://github.com/login/oauth`）は動的クライアント登録（DCR / RFC 7591）に非対応で、`client_id` を内蔵しない Claude Code は `Incompatible auth server: does not support dynamic client registration` で接続に失敗する。代わりに公式 `github` プラグイン（PAT ヘッダ）を採用した（[ADR-011](./011-official-github-plugin.md)）。PAT が再び必要になるため [ADR-005](./005-keychain-pat.md) を再有効化。以下は当時の判断の記録。
 
 ## コンテキスト
 
