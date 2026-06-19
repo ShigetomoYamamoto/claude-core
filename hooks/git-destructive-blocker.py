@@ -45,6 +45,17 @@ try:
     if is_git_invocation(cmd, 'push') and not re.search(r'(?:-f\b|--force\b|--force-with-lease\b)', cmd):
         branch = current_branch()
         if branch in PROTECTED:
+            # ブランチ削除系 push（--delete / -d / コロン refspec ":branch"）は、
+            # 削除対象が保護ブランチでなければ許可する。マージ済みブランチの掃除を
+            # 保護ブランチ上からでも通すための例外（誤検知の解消）。非保護ブランチの
+            # 削除は元々作業ブランチ上では許可されており、ここは挙動を一貫させるだけ。
+            is_delete = bool(re.search(r'--delete\b|(?:^|\s)-d\b|\s:\S', cmd))
+            if is_delete:
+                if any(re.search(rf'\b{re.escape(b)}\b', cmd) for b in PROTECTED):
+                    print('🔴 保護されたブランチを削除しようとしました。')
+                    print('保護ブランチ（main / master / develop 等）の削除は禁止です。')
+                    sys.exit(2)
+                sys.exit(0)  # 非保護ブランチの削除は許可
             print(f'🔴 保護されたブランチ "{branch}" から直接 push しようとしました。')
             print('作業ブランチから PR を作成してください。')
             print('  /create-branch → 実装 → /create-pr の手順で進めてください。')
