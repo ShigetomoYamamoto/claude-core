@@ -39,7 +39,7 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parent
 CLAUDE_DIR = Path.home() / ".claude"
 
-STATIC_DIRS = ["agents", "commands", "rules", "skills", "hooks", "workflows"]
+STATIC_DIRS = ["agents", "commands", "rules", "skills", "hooks", "workflows", "templates"]
 
 # settings.json merge policy (see module docstring)
 FORCE_HOOK_EVENTS = ["PreToolUse", "PostToolUse"]

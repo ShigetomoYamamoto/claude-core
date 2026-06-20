@@ -27,6 +27,7 @@ Claude Code のグローバル設定を管理する dotfiles リポジトリ。
 | `rules/` | コーディングスタイル・テスト・セキュリティ・エージェント運用ルール・Claude 使用効率化・自走/並列/メモリのループ運用ルール |
 | `skills/` | 参照スキル（loop-engineering, 3-line-contract, git-workflow）。TDD は `rules/testing.md`＋`/tdd`、セキュリティは公式 `security-guidance`＋`rules/security.md` に集約 |
 | `workflows/` | オーケストレーション用 Workflow テンプレート（loop-engineering-large-A: 大規模Aの計画→赤確認→実装→検証） |
+| `templates/` | コマンドが生成するファイルのテンプレート集（`init-autonomous/`: `/init-autonomous` が出力する CLAUDE.md/rules/commands/agents/docs/.github 等。肥大化したコマンド本体から外出し） |
 | `docs/` | 要件定義・アーキテクチャ・ADR |
 | `settings.json.template` | Claude Code 設定テンプレート（パス自動解決・プラグイン有効化を含む。構造マージのベース） |
 | `mcp.json` | MCP サーバー設定（GitHub / Playwright / Figma） |
@@ -131,7 +132,7 @@ cd ~/dotfiles/claude-config
 以下を行います：
 
 1. **preflight check** — 必須ツール（python3・git）の確認
-2. `agents/`, `commands/`, `hooks/`, `rules/`, `skills/`, `workflows/` を `~/.claude/` に **シンボリックリンク**（repo を編集すれば即 live に反映。実体ディレクトリがあれば `~/.claude/.backup/` に退避してからリンク化）
+2. `agents/`, `commands/`, `hooks/`, `rules/`, `skills/`, `workflows/`, `templates/` を `~/.claude/` に **シンボリックリンク**（repo を編集すれば即 live に反映。実体ディレクトリがあれば `~/.claude/.backup/` に退避してからリンク化）
 3. `settings.json` を **構造マージ**（下記）。`settings.json.template` のパスを解決して反映するが、**既存の設定は決して破壊しない**
 4. `mcp.json` の MCP サーバー設定を `~/.claude.json` にマージ（既存は保持、不足分のみ追加）
 
@@ -238,7 +239,7 @@ docs/02_detailed-design.md         ← /design の詳細設計
 
 ## 別マシンで最新の設定を取得するとき
 
-`agents/`・`commands/`・`rules/`・`skills/`・`hooks/`・`workflows/` は symlink なので **`git pull` だけで即反映**されます。`settings.json.template` や `mcp.json` を変更したときだけ `./setup.sh` を再実行してください。
+`agents/`・`commands/`・`rules/`・`skills/`・`hooks/`・`workflows/`・`templates/` は symlink なので **`git pull` だけで即反映**されます。`settings.json.template` や `mcp.json` を変更したとき、または **symlink 対象ディレクトリを新規追加したとき**（例: `templates/`）だけ `./setup.sh` を再実行してください。
 
 ```bash
 cd ~/dotfiles/claude-config
@@ -260,7 +261,7 @@ git pull
 
 ## 拡張方法
 
-新しいエージェント・コマンド・hook・workflow・MCP を追加する手順です。`agents/`・`commands/`・`rules/`・`skills/`・`hooks/`・`workflows/` は symlink のため、追加後は他マシンで `git pull` するだけで反映されます（`settings.json.template` や `mcp.json` を変えた場合のみ `setup.sh` を再実行）。
+新しいエージェント・コマンド・hook・workflow・MCP を追加する手順です。`agents/`・`commands/`・`rules/`・`skills/`・`hooks/`・`workflows/`・`templates/` は symlink のため、追加後は他マシンで `git pull` するだけで反映されます（`settings.json.template` や `mcp.json` を変えた場合のみ `setup.sh` を再実行）。
 
 ### 新エージェントを追加
 

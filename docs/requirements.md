@@ -118,7 +118,7 @@
 
 | 項目 | 内容 |
 |---|---|
-| 設定ディレクトリの配置 | `install.py`（`agents/` `commands/` `hooks/` `rules/` `skills/` `workflows/` を repo への symlink。`git pull` で即反映） |
+| 設定ディレクトリの配置 | `install.py`（`agents/` `commands/` `hooks/` `rules/` `skills/` `workflows/` `templates/` を repo への symlink。`git pull` で即反映） |
 | Claude Code 設定生成 | `install.py`（`settings.json.template` → `~/.claude/settings.json` を FORCE/DEFAULT の2規則で構造マージ。live キーは削除しない） |
 | MCP 設定マージ | `install.py`（`mcp.json` → `~/.claude.json`、不足分のみ追加） |
 | 事前検証（preflight check） | `install.py`（必須ツールが無ければ案内して exit） |
