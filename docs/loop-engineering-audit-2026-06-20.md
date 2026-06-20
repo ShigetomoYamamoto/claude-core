@@ -2,6 +2,23 @@
 
 [ADR-014](./adr/014-loop-engineering-as-discipline.md) で確定した骨格(4不変条件・再帰モデル・入口一元化/判断者1人・ゲート導出)に対し、全資産(agents 16・commands 23・skills 3・workflows 1・hooks 8・rules 12 ≒ 63ファイル)を「5問の篩」で監査した記録。読み取り専用エージェント6体で分担評価し、結論を左右する重い判定は実ファイルで裏取り済み。
 
+## ⚠️ 追記(同日・コードレビューによる訂正)
+
+**本監査は「適合性監査(5問の篩)」であり、コード品質レビューではない。** その限界が露呈した:
+骨格整合の修正後に独立 `reviewer`(maker≠checker)で `workflows/loop-engineering-large-A.js` と
+`hooks/mass-delete-blocker.py` を厳密レビューしたところ、**CRITICAL 2・HIGH 2** の実バグが見つかった
+(適合性監査では検出できていなかった):
+
+- **CRITICAL** `mass-delete-blocker.py` の rm 検出正規表現 `…|…` が未グルーピングで第2枝が rm を要求せず、
+  `docker run -fr` 等を誤検出(自走時は ask→deny で無害なコマンドが停止)。
+- **CRITICAL** root/home の即ブロックが `rm -rf /*` / `"/"` / `/usr` を取りこぼし、最も破滅的な削除が ask 止まり。
+- **HIGH** 分離/大文字フラグ `rm -r -f` / `-fR` を検知できず素通り(docstring の約束と不一致)。
+- **HIGH** `loop-engineering-large-A.js` 実装ループが `agent()` の null を握り潰し、verify_failed に化けて誤誘導。
+
+→ いずれも修正済み(hook はトークン解析へ書き直し29ケースで検証、workflow は null ガード追加・`A`→`parsedArgs` 改名)。
+**教訓: 適合性監査の後は必ずコードレビュー(reviewer)を回す。** 下表の「残す/確信度高」は
+「骨格に適合」の意味であって「コードが無欠陥」ではない。
+
 ## 5問の篩
 
 1. どの段(rung)の実装か?
@@ -42,7 +59,7 @@
 | commands/review-loop-cross.md | レビュー段(モデル分離) | 残す | checker を別モデルにし不変条件2を最強化。外部CLIは人間確認 |
 | commands/review-loop-cross-path.md | レビュー段(パス指定) | 残す | 非git/差分なしの穴を埋める正当分岐 |
 | skills/loop-engineering/SKILL.md | コード段+完了判定の統括 | 残す | VISION=不変条件1。STEP0 の二重判断リスクは P4 で是正 |
-| workflows/loop-engineering-large-A.js | コード段(A-大) | 残す | RedGate・戻りチャネル等の決定的ガード。レビューは委譲 |
+| workflows/loop-engineering-large-A.js | コード段(A-大) | 残す(要コード修正→済) | RedGate・戻りチャネル等の決定的ガード。レビューは委譲。※同日コードレビューで実装ループの null 握り潰し(HIGH)を修正・`A`→`parsedArgs` 改名(上「追記」参照) |
 
 ## ② 上段ラダー: 要件/設計/計画(8)
 
@@ -119,7 +136,7 @@
 | hooks/doc-blocker.py | 物理層(生成抑制) | 残す | 規範のハード化 |
 | hooks/git-add-secret-blocker.py | 物理層(不可逆=漏洩防止) | 残す | 効く/効かない範囲を明示=模範 |
 | hooks/git-destructive-blocker.py | 物理層(不可逆ブロック中核) | 残す | 保護ブランチ/force push/reset --hard 等を exit 2 |
-| hooks/mass-delete-blocker.py | 物理層(確認ゲート) | 再定義済み | 非ルートの rm -rf・閾値超ワイルドカード削除を `permissionDecision=ask` で実行前の人間確認に格上げ(ルート/HOME は exit 2 維持)。P6 の未決点を解決 |
+| hooks/mass-delete-blocker.py | 物理層(確認ゲート) | 再定義済み(要バグ修正→済) | 非ルートの再帰削除・閾値超ワイルドカード削除を `permissionDecision=ask`、root/system/home は exit 2。※同日コードレビューで正規表現の誤検出/取りこぼし(CRITICAL×2・HIGH)を修正し、単一正規表現→トークン解析へ。29ケースで検証(上「追記」参照) |
 | hooks/pr-base-checker.py | 物理層(PR=外向き) | 残す | develop 強制。MCP 経由は対象外(範囲明示済み) |
 | hooks/protected-branch-edit-guard.py | 物理層(予防) | 残す | 保護ブランチ上の Edit/Write を exit 2 |
 | hooks/secret-detection.py | 物理層(検出・非ブロック) | 再定義して残す | exit 2 なし=検出器。名と層を明示(P6) |

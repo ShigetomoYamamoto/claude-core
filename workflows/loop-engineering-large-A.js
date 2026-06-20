@@ -91,34 +91,34 @@ const VERIFY_SCHEMA = {
 // ---------- args ----------
 // この環境では args が「パース済みオブジェクト」ではなく「JSON 文字列」でスクリプトに届くことがある
 // (実測: typeof args === 'string')。オブジェクト/文字列のどちらで来ても動くよう冒頭で正規化する。
-let A = args
-if (typeof A === 'string') {
+let parsedArgs = args
+if (typeof parsedArgs === 'string') {
   try {
-    A = JSON.parse(A)
+    parsedArgs = JSON.parse(parsedArgs)
   } catch (e) {
     return { status: 'bad_args', message: 'args を JSON として解釈できませんでした。{mode:"plan"|"execute", ...} を渡してください。' }
   }
 }
-if (!A || typeof A !== 'object') {
+if (!parsedArgs || typeof parsedArgs !== 'object') {
   return { status: 'bad_args', message: 'args が空です。{mode:"plan"|"execute", goal, scope, ...} を渡してください。' }
 }
-const mode = A.mode
+const mode = parsedArgs.mode
 // scope は配列前提(plan の fan-out, execute の Set/filter/map/join が配列を要求する)。
 // 文字列(カンマ区切り)で来ても配列化する。配列/文字列/未指定 以外の型は弾く。mode 分岐より前なので plan/execute 両方を守れる。
 let scope
-if (Array.isArray(A.scope)) {
-  scope = A.scope.map((s) => String(s).trim()).filter(Boolean)
-} else if (typeof A.scope === 'string') {
-  scope = A.scope.split(',').map((s) => s.trim()).filter(Boolean)
-} else if (A.scope == null) {
+if (Array.isArray(parsedArgs.scope)) {
+  scope = parsedArgs.scope.map((s) => String(s).trim()).filter(Boolean)
+} else if (typeof parsedArgs.scope === 'string') {
+  scope = parsedArgs.scope.split(',').map((s) => s.trim()).filter(Boolean)
+} else if (parsedArgs.scope == null) {
   scope = []
 } else {
   return { status: 'bad_args', message: 'scope は配列(例 ["src/foo.ts"])かカンマ区切り文字列で渡してください。' }
 }
-const focus = A.focus || '(なし=reviewer デフォルト観点)'
-const goal = A.goal || ''
-const verifyCmd = A.verifyCmd || 'npm run verify'
-const vision = A.vision || null
+const focus = parsedArgs.focus || '(なし=reviewer デフォルト観点)'
+const goal = parsedArgs.goal || ''
+const verifyCmd = parsedArgs.verifyCmd || 'npm run verify'
+const vision = parsedArgs.vision || null
 
 if (mode !== 'plan' && mode !== 'execute') {
   return {
@@ -346,6 +346,19 @@ for (let i = 0; i < units.length; i++) {
     }
   )
   implResults.push(r)
+  if (!r) {
+    // 実装担当が null(エージェント失敗/スキュー)。他フェーズ(RedGate/Verify)と同様に明示停止。
+    // これを握り潰すと未実装のまま Verify に進み verify_failed に化け、誤った復旧手順に誘導される。
+    return {
+      mode: 'execute',
+      status: 'impl_error',
+      reason:
+        '実装担当(fixer)が結果を返しませんでした(エージェント失敗/スキュー)。当該ユニットを再実行せよ。' +
+        'verify_failed とは別物(実装が走っていない)。',
+      module: u.label,
+      doneSoFar: implResults.filter(Boolean),
+    }
+  }
   if (r && r.status === 'needs_vision_revision') {
     // 戻りチャネル: 人間の承認ゲートに戻す。これ以上実装しない。
     return {
