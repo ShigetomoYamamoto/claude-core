@@ -77,6 +77,7 @@
 
 ## 関連
 
+- [ADR-013](./013-official-plugin-policy.md) — 公式/自作をレイヤーで取捨選択する**一般原則**（本 ADR はその最初の具体適用）
 - [ADR-001](./001-two-layer-architecture.md) — 二層アーキテクチャ（グローバル設定とプロジェクト設定の分離）
 - [ADR-011](./011-official-github-plugin.md) — 公式 `github` プラグイン採用（同じ「公式委譲」方針の GitHub MCP 版）
 - `rules/agents.md` — Proactive Agent Invocation 表と公式委譲の注記
