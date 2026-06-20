@@ -114,6 +114,18 @@ Reason:      <error detail>
 - ALWAYS verify the rollback succeeded with a real request (not just exit code)
 - DOCUMENT the reason for rollback in the deployment log or commit message
 
+## Hard stop & irreversibility (invariants 3 & 4)
+
+- **Bounded (invariant 3):** verify the rolled-back version once; if it does not come up,
+  STOP and escalate rather than rolling further back in a loop.
+- **Irreversible, with NO physical layer (invariant 4):** rollback re-deploys a past
+  version (lossy if DB migrations are forward-only). **No hook blocks rollback commands** —
+  production confirmation is procedure-only. See `rules/loop-safety.md` and ADR-014.
+- **Not in the `/autorun` transition table — by design.** Autonomous runs only do
+  *auto*-rollback inside `deploy-runner` on verification failure. *Manual* rollback (this
+  agent) is human-initiated (`/rollback` or the `rules/agents.md` trigger), so it is
+  intentionally outside `rules/autorun-flow.md`'s whitelist — not a gap.
+
 ## Coordination
 
 - **migration-runner**: invoke if DB migrations need to be reversed

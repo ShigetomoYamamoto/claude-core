@@ -1,5 +1,11 @@
 #!/usr/bin/env python3
-"""PreToolUse(Bash): 大量ファイル削除・rm -rf を検知して確認・ブロックする"""
+"""PreToolUse(Bash): ファイル大量削除・rm -rf を検知する。
+
+二層モデル(ADR-014 / loop-safety「物理層」): これは「検出/警告層」であって全面ブロックではない。
+- ルート / HOME / $HOME の rm -rf のみ決定的ブロック(exit 2)。
+- それ以外の rm -rf、およびワイルドカード大量削除は warning のみ(exit 0)で人間の判断に委ねる。
+決定的に止めたい不可逆 git 操作は git-destructive-blocker.py(ハードブロック層)が担う。
+"""
 import json, sys, re, subprocess, glob
 
 THRESHOLD = 10  # この件数以上の削除で警告

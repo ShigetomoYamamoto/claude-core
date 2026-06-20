@@ -59,7 +59,7 @@
 | 自走（フロー全体） | `/autorun`（関門4点以外を自動連結） | autorun-flow に従い各フェーズへ連結 |
 | コード実装の自走 | loop-engineering スキル | reviewer / fixer |
 | レビュー→修正ループ | `/review-loop`・`/review-loop-cross`・`/review-loop-cross-path` | reviewer / fixer |
-| 検証ゲート（反証検証） | `/verify-loop` | code-reviewer（公式 pr-review-toolkit）/ security-reviewer（自作） |
+| 検証(反証多数決・任意の上位変種) | `/verify-loop`（手動・セキュリティ重点。**自走の verify ゲートは上行の `/review-loop`**） | code-reviewer（公式 pr-review-toolkit）/ security-reviewer（自作） |
 
 #### 保留（将来追加候補）
 

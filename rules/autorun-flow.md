@@ -50,6 +50,26 @@ output**. Have requirements-analyst emit a "needs new DB schema / new API / tech
 selection / system-boundary change?" flag; if all are unnecessary, skip the design
 gate and auto-advance to plan (don't stop or skip by mistake).
 
+## Scope handoff to the tdd phase (single judge)
+
+`/autorun` has already decided scope by the time it reaches `tdd` (requirements /
+analyze-task + plan produced file paths and ordered steps). When it delegates the tdd
+phase to `skills/loop-engineering/`, it passes that scope down in the preamble; the
+skill **adopts it and does NOT re-run its own STEP0 (A/B/C) sizing**. The A/B/C
+judgment is the skill's behavior only in standalone use (no RUN_STATE). This keeps a
+single judge of scope (see `rules/loop-safety.md` "Single entry, single judge" / ADR-014).
+
+## Requirement → VISION handoff (closing the loop top-to-bottom)
+
+The done-condition of the code rung (loop-engineering's VISION) is not invented from
+scratch under `/autorun`. The **acceptance criteria** produced at the requirements rung
+(`requirements-analyst`) or analyze-task rung (`task-analyst`) — which those agents must
+make *testable* — flow down through `plan` and become the **seed of the VISION predicates**
+at the tdd phase (one acceptance criterion → one machine-checkable VISION predicate, carried
+with a stable ID). This keeps the loop closed top-to-bottom: the thing the human approved at
+the gate is the same thing the machine checks at the bottom. loop-engineering adopts these
+rather than re-eliciting them (see `skills/loop-engineering/SKILL.md` STEP2; ADR-014).
+
 ## Mechanical verifiability check (at startup)
 
 At `/autorun` startup, detect via Bash whether every auto phase's success_test is
@@ -70,6 +90,13 @@ An autonomous run may stop ONLY at:
 7. Unrecoverable error (e.g. build-error-resolver hitting its cap)
 
 Stopping anywhere else is a definition violation — detect and report it.
+
+## Rollback is manual-only (intentionally not a phase)
+
+There is no `rollback` row in the table on purpose. Autonomous runs perform only
+*auto*-rollback, which lives inside `deploy-runner` on verification failure (part of the
+`deploy` phase). *Manual* rollback (`rollback-runner` / `/rollback`) is human-initiated and
+therefore deliberately outside this flow and its stop-whitelist — not a missing phase.
 
 ## Hard stop (two-layer)
 

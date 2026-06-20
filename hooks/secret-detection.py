@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
-"""PostToolUse(Edit|Write|MultiEdit): ハードコードされたシークレットを検出して警告"""
+"""PostToolUse(Edit|Write|MultiEdit): ハードコードされたシークレットを検出して警告。
+
+二層モデル(ADR-014 / loop-safety「物理層」): これは「検出/警告層」(exit 2 なし=止めない)。
+ステージ時の決定的ブロックは git-add-secret-blocker.py が担う(git add --dry-run で実ステージ対象を検査)。
+commit -a / stash など add を経由しない経路は、この検出層が書込後に後追いで拾う。
+"""
 import json, sys, re
 
 data = json.load(sys.stdin)

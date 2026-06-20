@@ -38,6 +38,8 @@ These agents MUST be invoked automatically — without waiting for the user to a
 
 > **公式プラグインへの委譲（2026-06-19〜・[ADR-012](../docs/adr/012-official-plugins-for-git-review-security.md)）:** 「危険操作は hooks で決定的に制御／振る舞いは公式に寄せる」方針。コードレビューは公式 `pr-review-toolkit`（`code-reviewer` ほか専門エージェント群）、コミット/ブランチ掃除は公式 `commit-commands`（`/commit-commands:commit`・`clean_gone`）、セキュリティは公式 `security-guidance`（編集時警告＋commit時LLMレビュー）に委譲。一方 `security-reviewer`・`reviewer`・`fixer`・`/create-pr` は公式に同等品が無い（または develop ベース強制 hook と衝突する）ため**自作を維持**する。危険操作の確定的ブロックは hooks（`git-destructive-blocker`・`pr-base-checker`・`git-add-secret-blocker`・`commit-msg-convention` ほか）が担う。
 
+> **物理層(hooks)のスコープ(過大に言わない・ADR-014):** hooks は **Bash 経由の git/PR と Edit/Write にのみ**作動する(settings の matcher が `Bash` / `Edit|Write|MultiEdit`)。**MCP 経由の push/PR(`mcp__plugin_github_github__create_pull_request` 等)・deploy/migrate/rollback コマンドには作動しない**。だから push/PR は `gh` CLI(Bash)に限定し、deploy/migrate/rollback の不可逆停止は「ゲート＋手続き」で担保する(物理層なし)。手続きだけの停止を「hooks が守る」と過信しないこと。
+
 ## Parallel Task Execution
 
 ALWAYS use parallel Task execution for independent operations:

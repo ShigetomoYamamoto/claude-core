@@ -137,6 +137,19 @@ Reason:      <error detail>
 - ALWAYS preserve previous deploy info for rollback
 - CONFIRM with user before deploying to production if any pre-deploy check shows warnings
 
+## Hard stop & irreversibility (invariants 3 & 4)
+
+- **Bounded (invariant 3):** verification/auto-rollback must not retry forever. Cap at
+  **2 attempts** (verify → rollback → verify) then STOP and report; the "30 seconds" in
+  Phase 4 is propagation wait, not a retry budget. Inherit any tighter ceiling from
+  `/autorun`'s per-phase budget or `rules/loop-safety.md` (default 20 turns / 30 min).
+- **Irreversible, with NO physical layer (invariant 4):** production deploy is
+  irreversible and **no hook blocks it** — `pr-base-checker.py` / `git-destructive-blocker.py`
+  fire only on Bash-routed git/PR, not on deploy commands (`vercel`, `fly deploy`,
+  `kubectl apply`). So the production gate is **human confirmation + procedure only**.
+  Treat the `/autorun` `deploy` gate and `rules/loop-safety.md` (irreversible-op confirmation)
+  as the real stop; never present "CONFIRM" as if a hook will catch a mistake. See ADR-014.
+
 ## Coordination
 
 - **migration-runner**: invoke first if DB schema changes are pending

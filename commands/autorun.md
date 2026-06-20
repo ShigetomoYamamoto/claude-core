@@ -41,7 +41,7 @@ current_phase が goal_phase を越えるまで繰り返す:
 
 1. `rules/autorun-flow.md` を読み、current_phase の行を引く。
 2. 実行部品を起動する（GOAL 再掲・直前フェーズ成果・SCOPE をプリアンブルで明示的に渡す）。
-   - **tdd** フェーズは `skills/loop-engineering/`（ミクロ層）に委譲。
+   - **tdd** フェーズは `skills/loop-engineering/`（ミクロ層）に委譲（渡した SCOPE を採用させ、STEP0 の A/B/C 再判定はさせない＝判断者1人。`rules/autorun-flow.md`「Scope handoff to the tdd phase」）。
    - **verify** フェーズは `/review-loop` に委譲。
 3. success_test を**機械的に実行**（Bash、結果を transcript 出力。自己申告で代替しない）。
 4. 偽なら: フェーズ内リトライ（tdd/verify は内部ループ、build エラーは build-error-resolver）。

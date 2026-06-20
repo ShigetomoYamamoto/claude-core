@@ -9,7 +9,7 @@ description: |
 
 `code-reviewer` / `security-reviewer` の「CRITICAL が 0 になるまで繰り返す」を、人間の判断を挟まずに回す。検出 → 検証 → 修正を `Workflow` のパイプラインで自律実行する。
 
-> **位置づけ（`/review-loop` との使い分け）:** コード1タスクの通常の磨き込みは層1の **`/review-loop`**（reviewer/fixer）に委譲する（autorun の verify フェーズもこれ）。本コマンドは **反証的多数決検証つきの上位変種**で、セキュリティ重視・誤検知を厳しく排除したい時にだけ使う。
+> **位置づけ（`/review-loop` との使い分け）:** コード1タスクの通常の磨き込みは層1の **`/review-loop`**（reviewer/fixer）に委譲する（autorun の verify フェーズもこれ）。本コマンドは **反証的多数決検証つきの上位変種**で、セキュリティ重視・誤検知を厳しく排除したい時にだけ使う。**自走（`/autorun`）の verify ゲートではない**（それは `/review-loop`）— 本コマンドは手動起動の任意変種(ADR-014 / 監査 P7)。
 
 ## 前提（`rules/loop-safety.md` 準拠）
 
