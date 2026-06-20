@@ -5,6 +5,21 @@ Rules for running Claude in autonomous "loops" — self-paced `/loop`, `/goal`,
 without a human prompt in between. A loop with no brakes is the failure mode,
 not the exception.
 
+## The four invariants (Loop Engineering constitution)
+
+Per [ADR-014](../docs/adr/014-loop-engineering-as-discipline.md), every Loop
+Engineering loop — at any scope (one code change, a review cycle, or a full
+`/autorun` pipeline) — must uphold four invariants. The guardrails in this file
+are how they are enforced in an autonomous run:
+
+1. **Done-condition is upfront, machine-checked, un-fakeable** — see Preconditions 1 & 3.
+2. **Maker ≠ checker** — whoever produces the work does not grade it — see Precondition 5.
+3. **Bounded** — every run carries an explicit hard stop — see Hard stops.
+4. **Human owns direction & irreversible** — see Irreversible / outward-facing actions.
+
+Invariants 1 & 3 keep the loop *correct*; 2 & 4 keep it *safe*. A loop that breaks
+any one of them is not Loop Engineering, however much machinery surrounds it.
+
 ## Preconditions (ALL required before starting a loop)
 
 Do NOT start an autonomous loop unless every one of these holds:
@@ -13,6 +28,11 @@ Do NOT start an autonomous loop unless every one of these holds:
 2. **Safe workspace** — work happens on a dedicated branch or git worktree, never on `main` / `master` / `develop`.
 3. **Mechanical success test** — tests / lint / type-check / a script decides success, NOT the agent's self-assessment.
 4. **Hard stop** — at least one explicit limit (turns, wall-clock, or token budget) is set (see below).
+5. **Separate checker** — success is judged by someone/something other than the maker:
+   a test the maker wrote that runs independently, a reviewer agent (`/review-loop`),
+   or a different model (`/review-loop-cross`). The implementer never signs off on its
+   own work (invariant 2). This is distinct from #3: #3 says "machine, not self-assessment";
+   #5 says "the grader is not the maker".
 
 If success cannot be judged mechanically (business judgment, creative direction,
 "make it nice"), DO NOT loop — keep a human in the decision.
@@ -40,6 +60,24 @@ first**, then stop and report. Never silently continue past a ceiling.
 - Pause for explicit human confirmation before irreversible or outward-facing steps
   (`git push`, deploy, delete, sending to external services) — even mid-loop.
   Approval in one iteration does NOT carry over to the next.
+- **Two enforcement layers, and their limit:** irreversible ops are guarded by a soft
+  regime (these rules) AND a hard physical layer (hooks). The physical layer fires ONLY
+  on Bash-routed git/PR and Edit/Write — NOT on MCP-routed push/PR, nor on deploy /
+  migrate / rollback commands. Route push/PR through `gh` CLI; for deploy/migrate/rollback
+  the stop is gate + procedure only (no physical layer). Never present a procedure-only
+  stop as if a hook backs it.
+
+## Single entry, single judge
+
+- **Scope / size is judged once, at the entry, from investigation** — not re-judged
+  downstream. When a higher layer has already decided scope (e.g. `/autorun` ran
+  analysis/planning before delegating the code rung to `skills/loop-engineering`),
+  the lower layer ADOPTS that decision and does NOT re-run its own sizing. Two judges
+  of the same thing can disagree — collapse them to one (see [ADR-014](../docs/adr/014-loop-engineering-as-discipline.md)).
+- **Gates are derived, not placed** — a boundary is a human gate IFF its done-condition
+  is not machine-checkable (a direction judgment) or its action is irreversible. The
+  four `/autorun` gates (requirements / design / PR / deploy) are the *consequence* of
+  this rule applied to each phase, not an arbitrary choice.
 
 ## `/goal` completion-condition recipe
 

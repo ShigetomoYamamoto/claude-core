@@ -36,7 +36,7 @@ Claude Code のグローバル設定を管理する dotfiles リポジトリ。
 
 ## ループ自走（Loop Engineering）運用
 
-目的を渡せば検証しながら自走する仕組みを、安全装置（`rules/loop-safety.md`）を核に、5層で備えています。
+目的を渡せば検証しながら自走する仕組みを、安全装置（`rules/loop-safety.md`）を核に、5層で備えています。規律としての定義（4不変条件・再帰モデル・入口一元化・ゲート導出）は [ADR-014](./docs/adr/014-loop-engineering-as-discipline.md) が正本です。
 
 | 層 | 主な成果物 | 役割 |
 |----|-----------|------|
@@ -59,7 +59,7 @@ Claude Code のグローバル設定を管理する dotfiles リポジトリ。
 
 # レビュー→修正を指摘0まで自律で回す
 /review-loop      # 通常（Claude が reviewer/fixer を回す）
-/verify-loop      # 反証検証つき（自走フローの検証ゲート）
+/verify-loop      # 反証検証つきの手動変種（セキュリティ重点。自走の verify ゲートは /review-loop）
 ```
 
 ## settings.json.template の主な設定
@@ -176,6 +176,8 @@ cd ~/dotfiles/claude-config
 > **関門でのみ止まります**（全自動＝要件・設計・PR・デプロイ／サポート＝PR）。それ以外は自動連結。
 > 各フェーズコマンド（`/requirements`・`/design`・`/plan`・`/commit-commands:commit`・`/create-pr` 等）は**単発でも使え**、その場合は従来どおりコマンド完了で停止して次を案内します（自動連結は autorun 文脈でのみ）。
 > コード1実装だけを検証付きで回したいときは `loop-engineering` スキル（「〜を実装して」で起動）。
+>
+> **入口の振り分け（単一入口・[ADR-014](./docs/adr/014-loop-engineering-as-discipline.md)）:** 素の自然言語は、まず **loop-engineering** が受けて scope を測る（STEP0）。範囲が限定的なコード変更はそのまま実装し、**要件・設計の確定や多段の出荷（PR/デプロイ）まで要る**と判明したら `/autorun` に格上げする。最初からパイプラインを回すなら明示的に `/autorun <目的>`。同じ scope 判断を二度しない（判断者は常に1人＝調査して段を選ぶ）。
 
 ## 使い方
 

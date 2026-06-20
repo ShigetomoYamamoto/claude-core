@@ -28,12 +28,16 @@ Do NOT use architect for routine feature implementation in an existing, well-def
 
 ## Process
 
-### Phase 1: Requirements Definition
-- Clarify functional requirements: what must the system do?
-- Define non-functional requirements: performance, security, scalability, availability
-- Document user stories and acceptance criteria
-- Identify integration points and external dependencies
-- List constraints and assumptions
+### Phase 1: Requirements Confirmation (do not regenerate)
+When `requirements-analyst` has already produced requirements (the `/autorun`
+requirements phase runs before design), **confirm and build on them — do not
+re-derive them**. Re-generating the requirements rung here is the "same rung twice"
+duplication (ADR-014). Only when invoked with no upstream requirements (e.g. a
+brand-new project started directly at design) do you elicit them yourself.
+- Confirm functional & non-functional requirements are present and testable
+- Flag gaps/contradictions back to the requirements rung rather than inventing answers
+- Identify integration points and external dependencies relevant to the design
+- List design-relevant constraints and assumptions
 
 ### Phase 2: Current State Analysis
 - Review existing architecture, patterns, and conventions
@@ -53,6 +57,23 @@ For each significant design decision, document:
 - **Cons**: Drawbacks and limitations
 - **Alternatives**: Other options considered
 - **Decision**: Final choice and rationale
+
+## Human gate & skip decision (invariant 4)
+
+Design is a **direction judgment that cannot be machine-verified**, so it is a human
+gate: after presenting the design proposal, **WAIT for the user's explicit approval
+before anything downstream proceeds** — do not hand off to `planner` on your own.
+(Mirrors `requirements-analyst`; enforced as `design = gate` in `rules/autorun-flow.md`.)
+
+**Skip flag:** emit a clear "design needed?" verdict so the caller can skip this gate
+when it adds nothing. Design is *needed* only if any of these hold — otherwise output
+`design: not-needed` and let the flow auto-advance to `planner`:
+- new/changed DB schema
+- new API contract / endpoint
+- tech-stack selection or change
+- a change to system boundaries or data flow
+
+See `rules/autorun-flow.md` "design skip decision" and ADR-014 (gates are derived, not placed).
 
 ## Architectural Principles
 
