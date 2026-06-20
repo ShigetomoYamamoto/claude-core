@@ -305,36 +305,15 @@ A-大(多ファイル/移行/重い仕様):
 2. **承認ゲートは「VISION 述語に載らない口頭前提・暗黙の微決定」を人間が注入する場**。ここで拾えなかった穴はガード 3 で拾う。
 3. **戻りチャネル(★最重要)**。実装中に VISION の穴が判明したら、fixer は**推測で埋めず**ループを抜けて承認ゲートへ戻り VISION を補修する。**同一コンテキストでも独断で VISION を解釈・補修しない**(workflow は `needs_vision_revision` で停止し人間に返す)。
 
-### workflow テンプレ `loop-engineering-large-A`
+### workflow `loop-engineering-large-A` の起動(契約は workflow が単一の正)
 
-- 実体は `~/.claude/workflows/loop-engineering-large-A.js`(Workflow ツールで起動)。**2 回に分けて**起動する:
-  - `{mode:"plan", goal, scope, focus?}` … Plan を fan-out → **意味的重複の統合 + 抜け漏れ補完 + ID を axis ごとに一意化**して VISION 草案(`visionDraft.conditions`)を返す。fan-out 各エージェントは独立採番するため ID が衝突するが、workflow が統合・振り直し済みで返す(オーケストレータの手作業は不要)。`rawCount`(統合前)/ `consolidatedCount`(統合後)も返る。
-  - `{mode:"execute", vision:<承認版>, scope, verifyCmd?, focus?}` … 赤確認(RedGate)→最小実装→verify。`vision` は plan の `visionDraft` を人間が承認・補修したもの。`focus` は重点観点(任意)。
-  - **`scope` は配列**(例 `["src/foo.ts", "src/bar.ts"]`)。カンマ区切り文字列を渡しても配列化して受理する。配列/文字列以外は `bad_args`。
-- **計画と実装の間に必ず人間の承認ゲートを挟む**。Workflow はバックグラウンド自律実行で**途中に人間ゲートを置けない**ため、ゲートはメイン会話側に置き、**承認済み VISION を execute に渡す**設計(承認なしに実装は始められない)。承認時に、述語に載らない口頭前提・暗黙の微決定を人間が注入してよい(述語の具体化・条件削除は可。新規条件を足したら赤テストを書いて赤を見てから execute する)。
-- **module タグは全[機械]条件に付ける(モジュール分割)か、全く付けない(一括)かに統一**する。混在や scope と module の不一致は `bad_args` / `scope_mismatch` で停止する(静かな取りこぼし防止)。
-- レビュー往復(reviewer↔fixer)は **workflow に入れず** `/review-loop` に委譲する(アンチパターン「往復ロジックを自作しない」を守るため)。
-- ⚠️ Workflow はサブエージェントを多数起動しトークンを使う。**A-大と判断したときだけ**使い、毎回は使わない。⚠️ `verifyCmd` は編集なしで実行できること(検証は読取専用エージェントが回す)。
-
-#### 返り値 status 早見表(出力をこう捌く)
-
-| status | 意味 | 次の一手 |
-|---|---|---|
-| `plan_ready` | (plan)VISION 草案ができた | 草案を利用者に見せて承認ゲート → 赤テスト作成 → execute |
-| `green` | verify exit 0 + 全[機械]条件が緑 | `/review-loop`(SCOPE=`changedFiles`)→ STEP 6 で再 verify + ID 照合 |
-| `precondition_failed` | 赤テスト前提が未達 | `missingTests`=新規にテスト / `falsePositives`=書き直して赤を出す → 再 execute |
-| `needs_vision_revision` | 実装中に VISION の穴が判明(戻りチャネル) | `visionHole`/`conditionId` を見て承認ゲートで VISION 補修 → 再 execute(下記) |
-| `verify_failed` | exit≠0 か未緑条件あり | STEP 4 へ戻り修正。緑まではレビューに進まない。条件は緩めない |
-| `verify_error` | 検証担当が失敗(実装失敗とは限らない) | verify を再実行(実装は `doneSoFar` で完了済み) |
-| `blocked` | 実装担当が続行不能 | `notes`/`conditionId` を見て会話側で対処 |
-| `bad_args` / `scope_mismatch` | 入力不備 | メッセージに従い引数/VISION を直す |
-
-#### `needs_vision_revision` が返ったら(戻りチャネルの捌き方)
-
-1. `visionHole` を読み、`conditionId` の条件のどこが曖昧/矛盾/実装不可かを把握する。
-2. 承認ゲートに戻り、その条件の述語を具体化する(書き直した赤テストが書けるまで)。
-3. 修正版 VISION **全体**(直さない条件も含める)で `{mode:"execute", vision:<補修版>, scope, verifyCmd}` を再実行。`doneSoFar` の済みモジュールは触らない。
-4. **同じ穴で 2 回続けて止まったら**、条件分割 or `[AI]` 化を検討し、止めて利用者に相談(独断で埋めない)。
+- 実体は `~/.claude/workflows/loop-engineering-large-A.js`(Workflow ツール)。**2回に分けて**起動: `{mode:"plan", goal, scope}` → 人間承認ゲート(会話側)→ `{mode:"execute", vision:<承認版>, scope, verifyCmd}`。
+- **引数・返り値 `status`・各 status の捌き方は、workflow 本体の `meta.whenToUse` と返り値メッセージ(`reason` / `nextStep`)が単一の正。ここに再掲しない**(同じ契約を2か所に持たない=ドリフト防止。ADR-014)。返ってきた `status` と `nextStep` をそのまま読んで従う。
+- workflow に書けない「会話側の責務」だけ押さえる:
+  - **人間ゲートは会話側**(Workflow は途中で人間に聞けない)。plan→execute の間に承認を挟み、承認なしに execute しない。
+  - **レビュー往復は workflow に入れない** → `/review-loop` に委譲(STEP5 のまま)。
+  - **戻りチャネル**: `needs_vision_revision` が返ったら推測で埋めず、承認ゲートで VISION を補修してから再 execute。同じ穴で2回続けて止まったら利用者に相談。
+- ⚠️ サブエージェントを多数起動しトークンを使う。**A-大と判断したときだけ**。`verifyCmd` は編集なしで実行できること。
 
 ---
 
