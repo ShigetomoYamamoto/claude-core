@@ -20,6 +20,15 @@ are how they are enforced in an autonomous run:
 Invariants 1 & 3 keep the loop *correct*; 2 & 4 keep it *safe*. A loop that breaks
 any one of them is not Loop Engineering, however much machinery surrounds it.
 
+**`/autorun --vibing` exception (the only carve-out, ADR-015):** vibing relaxes
+invariant 4's *pre-confirmation* — and only for **reversible** irreversible/outward ops
+(PR push, auto-rollback-capable deploy). Invariants **1, 2, and 3 stay inviolable**, and
+the unrecoverable ops (external send, destructive migrate, rollback-incapable deploy)
+keep their human gate. The relaxation is paid for with post-hoc audit + auto-rollback +
+transcript record (mitigation, not a gate). Vibing is only safe *because* invariant 1
+(the machine-checked done-condition) still closes top-to-bottom; if invariant 1 breaks,
+vibing is no longer safe.
+
 ## Preconditions (ALL required before starting a loop)
 
 Do NOT start an autonomous loop unless every one of these holds:
@@ -66,6 +75,14 @@ first**, then stop and report. Never silently continue past a ceiling.
   migrate / rollback commands. Route push/PR through `gh` CLI; for deploy/migrate/rollback
   the stop is gate + procedure only (no physical layer). Never present a procedure-only
   stop as if a hook backs it.
+- **Under `--vibing` (ADR-015):** the pre-confirmation above is dropped for **reversible**
+  ops (PR push, auto-rollback-capable deploy) and replaced by post-hoc audit +
+  auto-rollback + transcript record. **Unrecoverable ops keep the pre-confirmation gate**:
+  external send, destructive migrate (DROP/RENAME/TRUNCATE…), and deploy with no detectable
+  auto-rollback. Detection is by machine predicate with **fail-safe = gate** (undetectable
+  or unparseable → stop). The physical-layer limit above is unchanged — vibing's PR→main is
+  allowed only via the `pr-base-checker.py` marker on the Bash(gh CLI) route; MCP-routed PR,
+  deploy, and migrate have no physical layer even under vibing.
 
 ## Single entry, single judge
 
@@ -118,3 +135,25 @@ When `/autorun` runs a full pipeline (requirements → … → deploy/PR) per
   `git-destructive-blocker.py`) only fire on git/Bash-routed push/PR — NOT on deploy
   commands or MCP-routed push/PR. So push/PR must go through `gh` CLI (Bash); deploy's stop
   is gate + procedure only (no physical layer).
+- **With `--vibing` (ADR-015)**: `resolve_kind` (defined in `rules/autorun-flow.md`)
+  demotes pr and reversible deploy to `auto`; the gates that remain are requirements,
+  design (when `design_needed`), and the unrecoverable-op gates. The two-layer hard stop is
+  unchanged except the whole-run transition cap is raised (full-auto=24 / support=14); the
+  session ceiling and per-phase budgets are NOT changed, so the time ceiling still bounds
+  the run.
+
+## Vibing residual risk (`--vibing` only)
+
+Dropping invariant 4's pre-confirmation moves the only guard for reversible irreversible
+ops to *after* the fact. Be honest about what that costs:
+
+- The single point of failure is the gate-retention predicate set
+  (`migrate_destructive` / `deploy_irreversible` / `external_send`). A false negative
+  (treating an unrecoverable op as reversible) is an unrecoverable accident, so all three
+  **fail safe = gate**: undetectable, untaken, or unparseable inputs stop the run.
+- Auto-rollback only covers deploy-verification failure. **Data already sent externally and
+  schema already DROPped cannot be rolled back** — that is exactly why those ops keep the
+  pre-confirmation gate.
+- The external-send / migrate / deploy gates have **no physical layer** (procedure only).
+  Vibing's main PR is allowed only through the `gh` CLI marker; never claim a hook backs
+  the procedure-only stops.
