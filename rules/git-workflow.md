@@ -20,6 +20,10 @@ These rules apply whenever any agent performs git operations — not just when `
 - Base branch is always `develop`. Never open PRs directly to `main` or `master`.
 - If there are uncommitted changes, stop and guide the user to run `/commit-commands:commit` first.
 - Do not push unless the PR flow requires it, and confirm before doing so.
+- **Exception — `/autorun --vibing` only:** vibing may open a PR to `main` via the
+  `pr-base-checker.py` vibing marker (ADR-015). This is the *only* path that bypasses the
+  develop-base rule, and it applies solely to vibing; normal usage and plain `/autorun`
+  keep `develop` as base unchanged.
 
 ---
 

@@ -23,17 +23,25 @@ description: |
 5. **commit 包括承認** — 「自走中、関門以外の commit を確認なしで自動実行してよいか」を1回だけ
    確認し承認を得る（`rules/git-workflow.md` の自走時例外）。承認が得られなければ commit を
    gate 扱いにする。
+6. **`--vibing` フラグ受理（任意）** — 付いていれば RUN_STATE.vibing=true。vibing は方向ゲート
+   （要件・条件付き設計）と巻き戻し不能操作以外の事前確認を外すモード。起動時に「PR push と巻き戻し
+   可能な deploy の事前確認を外す（巻き戻し不能操作は確認を残す）」旨を1回提示し合意を取る。降格規則・
+   ハードストップ値の正は `rules/autorun-flow.md`「vibing demotion rules」、安全規律は
+   `rules/loop-safety.md` を参照（本コマンドに定義実体は置かない・ADR-015）。`--isolation`（任意の
+   安全ダイヤル・既定 none）も受理する。
 
 ## ステップ 2: モード判定
 
 入力が自由形式の目標 → full-auto / 具体タスク・Issue → support。autorun-flow.md のモード表から
-start / goal を取得する。
+start / goal を取得する。`--vibing` は第3モードではなく、full-auto / support どちらにも重畳する
+直交フラグ（ADR-015）。
 
 ## ステップ 3: RUN_STATE 初期化（会話内に可視化）
 
-`RUN_STATE = { mode, current_phase, goal_phase, phase_outputs, gates_passed, budget, branch, commit_blanket_approved }`
-を初期化し transcript に表示する（loop-safety の「全ステップを出す」準拠）。肥大化したら直近 1-2
-フェーズ重視で要約圧縮する（`commands/review-loop.md` の引き継ぎ規律に倣う）。
+`RUN_STATE = { mode, current_phase, goal_phase, phase_outputs, gates_passed, budget, branch, commit_blanket_approved, vibing, design_needed, isolation }`
+を初期化し transcript に表示する（loop-safety の「全ステップを出す」準拠）。`vibing` / `design_needed`
+/ `isolation` は vibing 用（無印では vibing=false で従来どおり）。肥大化したら直近 1-2 フェーズ重視で
+要約圧縮する（`commands/review-loop.md` の引き継ぎ規律に倣う）。
 
 ## ステップ 4: 反復ループ
 
@@ -47,11 +55,13 @@ current_phase が goal_phase を越えるまで繰り返す:
 4. 偽なら: フェーズ内リトライ（tdd/verify は内部ループ、build エラーは build-error-resolver）。
    フェーズ内上限 or 膠着で STOP・報告。
 5. 真なら kind 分岐:
+   - vibing 時は分岐の**直前に `resolve_kind(phase, RUN_STATE)` を適用**し、降格後の kind で分岐する
+     （導出規則の正は `rules/autorun-flow.md`「vibing demotion rules」。評価結果は transcript に出す）。
    - **auto** — 確認を取らず next へ自動遷移。commit フェーズは包括承認のもと自動（メッセージは提示）。
    - **gate** — 停止プロトコル（関門名・成果サマリ・次に進むと何が起きるか・承認/修正/中止を提示し
      **能動的にターン終了**）。承認後のみ next。承認は gates_passed に記録し次に持ち越さない。
-6. **design スキップ** — autorun-flow.md のスキップ条件（requirements 成果で判定）を満たせば
-   design gate ごとスキップして plan へ。
+6. **design スキップ** — autorun-flow.md のスキップ条件（requirements 成果の `design_needed` で判定）を
+   満たせば design gate ごとスキップして plan へ。vibing も同じ `design_needed` を使う（新基準は設けない）。
 7. **ゴールドリフト検知** — 各フェーズ境界で (a) 構造ゴール=goal_phase 到達、(b) 内容ゴール=確定要件
    への各成果の写像、の両方を確認。内容がズレたら新目標を作らず STOP・報告。
 
@@ -66,6 +76,10 @@ current_phase が goal_phase を越えるまで繰り返す:
 - push / deploy / delete / 外部送信は自走中でも人間確認（関門 pr / deploy がこれを担う）。
 - push / PR は **gh CLI（Bash）経由**で行い、物理層の `pr-base-checker.py` /
   `git-destructive-blocker.py` が効くようにする（MCP 経由は物理層が抜けるため避ける）。
+- **vibing 時（ADR-015）**: 巻き戻し**可能**な不可逆操作（PR push・auto-rollback 可能な deploy）の
+  事前確認を外し、事後監査＋auto-rollback＋transcript 記録に置換する。巻き戻し**不能**な操作（外部送信・
+  破壊的 migrate・rollback 不能 deploy）は確認を残す（fail-safe=gate）。vibing の PR→main は gh CLI に
+  vibing マーカーを付けて `pr-base-checker.py` の例外を通す。詳細の正は `rules/loop-safety.md`。
 
 ## 関連
 
@@ -73,3 +87,4 @@ current_phase が goal_phase を越えるまで繰り返す:
 - `rules/loop-safety.md` — 安全規律の正本
 - `skills/loop-engineering/SKILL.md` — tdd フェーズの実装部品（ミクロ層）
 - `docs/adr/007-autonomous-loop-execution.md` / `docs/adr/008-orchestration-declarative-flow.md` — 設計決定
+- `docs/adr/015-vibing-mode.md` — `--vibing` フラグと kind 降格（`resolve_kind`）の決定
