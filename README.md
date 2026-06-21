@@ -181,10 +181,10 @@ cd ~/dotfiles/claude-config
 
 ```
 /autorun --vibing パスワードリセット機能を作って
-/autorun --vibing --support Issue #12 を実装して
+/autorun --vibing Issue #12 を実装して
 ```
 
-`--vibing` は②③に重畳する**直交フラグ**（第3モードではない・[ADR-015](./docs/adr/015-vibing-mode.md)）。**実行の不可逆操作の事前確認だけを外し、アーキ方向判断は人間が握る**という配分で、`PR🚦 → 本番デプロイ🚦` を無確認の自動連結に降格する:
+`--vibing` は②③に重畳する**直交フラグ**（第3モードではない・[ADR-015](./docs/adr/015-vibing-mode.md)）。モード（full-auto / support）は無印 `/autorun` と同じく**入力で自動判定**される（上の例なら「機能を作って」→ full-auto でデプロイまで、「Issue #12」→ support で PR まで）。**実行の不可逆操作の事前確認だけを外し、アーキ方向判断は人間が握る**という配分で、`PR🚦 → 本番デプロイ🚦` を無確認の自動連結に降格する:
 
 `要件🚦 → 設計🚦(条件付) → 計画 → 実装(TDD) → 検証 → コミット → PR(→main直結) → migrate → デプロイ`
 

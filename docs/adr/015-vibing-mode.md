@@ -49,8 +49,9 @@
 
 ### モードと起動
 
-- `--vibing` は full-auto/support 双方に乗る直交フラグ。コマンドは `/autorun --vibing <目的>`
-  （support 併用 `/autorun --vibing --support <Issue>`）。**無印 `/autorun` は ADR-007 のまま不変（後方互換）**。
+- `--vibing` は full-auto/support 双方に乗る直交フラグ。コマンドは `/autorun --vibing <目的>`。
+  モード（full-auto / support）は無印 `/autorun` と同じく入力で自動判定する（具体タスク/Issue を渡せば
+  support モードに vibing が乗る）。専用のモード上書きフラグは設けない。**無印 `/autorun` は ADR-007 のまま不変（後方互換）**。
 - 隔離（worktree / staging 限定等）は必須前提ではなく**任意のオプトイン安全ダイヤル**（既定で強制しない）。
 
 ### kind 降格（`resolve_kind` による導出）
