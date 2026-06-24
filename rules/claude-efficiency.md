@@ -17,6 +17,8 @@
 - Maximum reasoning requirements
 - Research and analysis tasks
 
+**Role separation:** Opus handles thinking (research, planning, decision-making); Sonnet/Haiku handle execution (editing, deletion, repeated operations). The automatic enforcement via `hooks/opus-execution-guard.py` is defined in `rules/role-separation.md`.
+
 ## Context Window Management
 
 Avoid last 20% of context window for:

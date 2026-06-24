@@ -23,6 +23,15 @@
         ]
       },
       {
+        "matcher": "Edit|Write|MultiEdit|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 __HOME__/.claude/hooks/opus-execution-guard.py"
+          }
+        ]
+      },
+      {
         "matcher": "Write",
         "hooks": [
           {
@@ -53,6 +62,10 @@
           {
             "type": "command",
             "command": "python3 __HOME__/.claude/hooks/commit-msg-convention.py"
+          },
+          {
+            "type": "command",
+            "command": "python3 __HOME__/.claude/hooks/opus-execution-guard.py"
           }
         ]
       }
