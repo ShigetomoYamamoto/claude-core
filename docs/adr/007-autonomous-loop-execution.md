@@ -64,4 +64,5 @@
 - 要件定義: `docs/requirements.md`（「AI エージェントが自走して開発を完成させる」）
 - ルール: `rules/loop-safety.md`（ハードストップ・ゴールドリフト・不可逆操作の唯一の正）
 - コマンド: `commands/autorun.md`（自走の入口）・`commands/verify-loop.md`（検証フェーズの自律ループ）
+- [ADR-015](./015-vibing-mode.md) — `--vibing` フラグ時に限り本 ADR の関門4点を部分 supersede（要件確定/設計確定は維持、PR作成と巻き戻し可能なデプロイを auto へ降格）
 - 後続作業: オーケストレーション層の実装、既存フェーズコマンドの停止設計の見直し（別 ADR / PR で扱う）

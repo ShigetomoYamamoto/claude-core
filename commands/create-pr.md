@@ -84,6 +84,23 @@ EOF
 )"
 ```
 
+### vibing 例外（`/autorun --vibing` 実行時のみ・ADR-015）
+
+vibing モードで pr フェーズを実行する場合に限り、base を `main` にし、コマンドの**末尾**に
+vibing マーカーのシェルコメントを付けて `pr-base-checker.py` の例外を通す（無印・通常運用では
+このステップは使わず常に develop ベース）。マーカーは末尾コメント位置（`#\s*__VIBING_AUTORUN_PR__\s*$`）
+でのみ有効で、`--title`/`--body` に書いても通らない:
+
+```bash
+gh pr create \
+  --base main \
+  --title "<生成したタイトル>" \
+  --body "$(cat <<'EOF'
+<生成した Description>
+EOF
+)"  # __VIBING_AUTORUN_PR__
+```
+
 ## ステップ 9: 完了報告
 
 PR作成後、以下を表示する：
@@ -97,5 +114,6 @@ PR作成後、以下を表示する：
 ⚠️ **PRを作成する前に必ずタイトルと Description をユーザーに確認すること。**
 
 ⚠️ **base ブランチは常に `develop` とする。**（main / master へのダイレクトPRは行わない）
+唯一の例外は `/autorun --vibing` 実行時のステップ8 vibing 分岐（末尾マーカー付き `--base main`・ADR-015）。
 
 ⚠️ **未コミットの変更がある場合は `/commit-commands:commit` を先に実行するよう案内すること。**

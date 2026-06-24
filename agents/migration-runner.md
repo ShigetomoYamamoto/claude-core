@@ -146,6 +146,18 @@ Recovery:     <next steps>
 - HALT if multiple environments are detected and target is ambiguous
 - WARN about forward-only migrations (no down() / no rollback path)
 
+## Hard stop & irreversibility (invariants 3 & 4)
+
+- **Bounded (invariant 3):** do not retry a failing migration in a loop. On failure,
+  STOP after the first failed apply and report recovery steps; inherit `/autorun`'s
+  per-phase budget / `rules/loop-safety.md` ceiling.
+- **Irreversible, with NO physical layer (invariant 4):** destructive migrations
+  (DROP / RENAME / data-lossy) are irreversible and **no hook blocks the migrate command**
+  (`alembic upgrade`, `prisma migrate deploy`, …). The dry-run + STOP in Phase 3 and the
+  backup check in Phase 4 are **procedure-only** guards — human confirmation is the real
+  gate (`rules/loop-safety.md` irreversible-op list; ADR-014). Never imply a hook will
+  catch a destructive migration.
+
 ## Coordination
 
 - **deploy-runner**: typically invoked before deploy-runner if migrations are pending
