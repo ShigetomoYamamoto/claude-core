@@ -35,7 +35,7 @@ Do NOT start an autonomous loop unless every one of these holds:
 
 1. **Clear done-condition** — completion can be stated in one sentence and is machine-verifiable.
 2. **Safe workspace** — work happens on a dedicated branch or git worktree, never on `main` / `master` / `develop`.
-3. **Mechanical success test** — tests / lint / type-check / a script decides success, NOT the agent's self-assessment.
+3. **Mechanical success test** — tests / lint / type-check / a script decides success, NOT the agent's self-assessment. **When the project has remote CI (e.g. GitHub Actions), local green is necessary but NOT sufficient — the done-condition includes remote CI green; never treat "local green" as merge-able on its own** (ADR-018).
 4. **Hard stop** — at least one explicit limit (turns, wall-clock, or token budget) is set (see below).
 5. **Separate checker** — success is judged by someone/something other than the maker:
    a test the maker wrote that runs independently, a reviewer agent (`/review-loop`),
@@ -69,6 +69,13 @@ first**, then stop and report. Never silently continue past a ceiling.
 - Pause for explicit human confirmation before irreversible or outward-facing steps
   (`git push`, deploy, delete, sending to external services) — even mid-loop.
   Approval in one iteration does NOT carry over to the next.
+- **Merging into a shared branch (`develop` / `main`) requires the head's remote CI to be
+  green, confirmed mechanically** (`gh run watch <run-id> --exit-status` / `gh pr checks --watch`)
+  before the merge. Red / not-yet-completed / undetectable → stop (fail-safe). This is procedure +
+  machine check only — **no physical layer** backs it (hooks fire on Bash git/PR, not on CI
+  status); do not present it as hook-enforced. Under `--vibing` this CI-green machine check is
+  **not** relaxed — vibing drops invariant 4's pre-confirmation, not invariant 1's machine
+  verification (ADR-015 / ADR-018).
 - **Two enforcement layers, and their limit:** irreversible ops are guarded by a soft
   regime (these rules) AND a hard physical layer (hooks). The physical layer fires ONLY
   on Bash-routed git/PR and Edit/Write — NOT on MCP-routed push/PR, nor on deploy /
@@ -125,7 +132,9 @@ When `/autorun` runs a full pipeline (requirements → … → deploy/PR) per
   and "no machine test → keep a human" (requirements/design). Non-gate phases auto-connect.
 - **Stop only on the whitelist**: gates / hard stop / per-phase retry cap / goal reached /
   startup precondition-or-verifiability failure / irreversible-op confirmation /
-  unrecoverable error. Stopping anywhere else is a definition violation — detect and report it.
+  unrecoverable error / **remote CI red or not-yet-completed at a `pr`-advance or shared-branch
+  merge point** (machine success_test unmet; fail-safe = stop — not relaxed by `--vibing`,
+  ADR-018). Stopping anywhere else is a definition violation — detect and report it.
 - **Hard stop is two-layer**: a per-phase budget (e.g. verify = 5 rounds) AND a whole-run
   budget (transition count + the session ceiling above). Either one triggers a stop.
 - **Goal drift is two-layer**: structural (reached `goal_phase` as planned) AND content

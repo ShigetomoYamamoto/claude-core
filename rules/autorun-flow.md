@@ -32,13 +32,24 @@ defined here (ADR-015).
 | tdd | `skills/loop-engineering/` (delegated to the micro layer) | auto | tests/lint/typecheck pass and coverage 80%+ (measured via Bash) | verify | verify |
 | verify | `/review-loop` (delegated) | auto | reviewer returns NO_ISSUES and mechanical checks pass | commit | commit |
 | commit | `/commit-commands:commit` | auto (※) | code-reviewer CRITICAL/HIGH=0 and secret-detection passes | pr | pr |
-| pr | `/create-pr` | **gate** | human approves the PR (push/PR via gh) | migrate | (goal) |
+| pr | `/create-pr` | **gate** | remote CI green（機械・CI 実在時）＋ human approves the PR（push/PR via gh） | migrate | (goal) |
 | migrate | `/migrate` | auto (destructive changes confirmed) | migration succeeds | deploy | — |
 | deploy | `/deploy` | **gate** | human approves the deploy | (goal) | — |
 
 ※ commit is kind=auto only because `/autorun` obtained a one-time blanket approval
 for auto-commits at startup (`rules/git-workflow.md` autonomous-run exception). The
 message is shown in the transcript every time. Without that approval, treat commit as a gate.
+
+## Remote CI green は pr の機械 success_test 成分（ローカル green では done としない）
+
+`pr` の success_test は2成分: **(機械) remote CI green** ＋ **(人間/無印) PR 承認**。ローカルの
+test/lint/typecheck green は必要条件だが十分ではない — チームが正とする remote CI（GitHub Actions 等）が
+green になって初めて done。PR push が CI を起動するので順序は「PR 作成 → CI 起動 → green 待ち（`gh run watch
+<run-id> --exit-status`）→ 前進/merge」。**赤 / タイムアウト / run 検出不能は STOP（fail-safe=停止）**。CI が
+実在しないプロジェクトは待つものが無いので skip するが、その旨を transcript にログする（起動時チェックで検出）。
+この機械成分は不変条件1（machine-checked done-condition, ADR-014）であり、**vibing でも降格しない**
+（vibing が外すのは PR 承認の*事前確認*＝人間ゲート成分だけ、後述 resolve_kind）。CI 待ちは「手続き＋機械チェック」
+で担保し**物理層（hook）は無い**（hooks は Bash 経由 git/PR のみ・過大表示しない、ADR-018）。
 
 ## Gates (kind=gate, the human always confirms)
 
@@ -75,6 +86,11 @@ base `kind` unchanged (so the four gates stand — full backward compatibility).
 
 So vibing actually drops only two pre-confirmations: **PR push** and **reversible
 deploy**. requirements/design remain direction gates; unrecoverable ops stay gates.
+
+**ただし pr の降格対象は PR 承認の*事前確認*（人間ゲート成分）のみ。** pr success_test のもう一方の成分である
+**remote CI green（機械成分）は不変条件1であり vibing でも降格しない** — vibing は事前確認を外すモードであって
+機械検証を外すモードではない（ADR-015 の不変条件1不可侵、ADR-018）。よって vibing でも pr→auto は remote CI
+green を機械確認してからでないと前進・merge しない。
 
 **Predicates for the kept stop points (single point of failure — fail-safe = gate):**
 
@@ -129,6 +145,12 @@ mechanically verifiable in this project (existence of test / lint / typecheck
 commands). If any is undetectable, stop early with "cannot self-run — reporting
 what's missing" (avoid stalling mid-run).
 
+Also detect whether the project has **remote CI** (a `.github/workflows/*.yml` triggered on
+pull_request / push). If present, `remote CI green` is required as the machine component of
+the `pr` success_test (above). If absent, there is nothing to wait for — skip the CI wait but
+**log "CI 未検出のため CI green チェックなし" to the transcript** so the omission is visible, never silent
+(ADR-018).
+
 ## Whitelist of places it may stop
 
 An autonomous run may stop ONLY at:
@@ -140,13 +162,16 @@ An autonomous run may stop ONLY at:
 5. Startup precondition / verifiability failure (early stop)
 6. Irreversible-op confirmation (migrate DROP/RENAME etc., all irreversible ops defined in `rules/loop-safety.md`)
 7. Unrecoverable error (e.g. build-error-resolver hitting its cap)
+8. Remote CI red / CI not yet completed at the `pr` advance point or a shared-branch (develop/main) merge point — the machine success_test (remote CI green) is unmet; merging red CI into a shared branch pollutes state others depend on (fail-safe = stop). See ADR-018.
 
 Stopping anywhere else is a definition violation — detect and report it.
 
 Under `--vibing` the whitelist's item 1 shrinks: the only gates that remain are
 **requirements, design (when `design_needed`), and the unrecoverable-op gates**
 (external send / destructive migrate / rollback-incapable deploy, per "vibing demotion
-rules"). pr and reversible deploy no longer stop. Items 2–7 are unchanged.
+rules"). pr and reversible deploy no longer stop. Items 2–8 are unchanged — in particular
+**item 8 (remote CI red/incomplete) is NOT removed by vibing**: it is a machine success_test
+(invariant 1), not a pre-confirmation gate (ADR-018).
 
 ## Rollback is manual-only (intentionally not a phase)
 
@@ -174,4 +199,5 @@ values here take effect only in an autonomous run (where RUN_STATE is declared).
 - `docs/adr/007-autonomous-loop-execution.md` — the four-gate decision
 - `docs/adr/008-orchestration-declarative-flow.md` — the declarative-flow decision and commit blanket approval
 - `docs/adr/015-vibing-mode.md` — the `--vibing` flag and the gate-demotion (`resolve_kind`) decision
+- `docs/adr/018-remote-ci-as-done-condition.md` — remote CI green as the machine success_test component of `pr` (invariant 1; not demoted by vibing)
 - `skills/loop-engineering/SKILL.md` — the tdd phase's execution part (micro layer)

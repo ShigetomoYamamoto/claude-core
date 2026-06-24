@@ -16,7 +16,10 @@ description: |
 1. **Preconditions** — `rules/loop-safety.md` の前提条件を満たすか確認。
 2. **機械検証可能性の前倒し** — 通る全 auto フェーズ（autorun-flow.md）の success_test が
    このプロジェクトで機械検証可能か（test / lint / typecheck コマンドの実在）を Bash で検出。
-   1つでも不能なら「自走不可・不足を報告」して停止。
+   1つでも不能なら「自走不可・不足を報告」して停止。あわせて **remote CI（`.github/workflows`
+   の PR/push トリガ）の実在も検出**し、あれば pr の success_test に CI green を必須化する。
+   無ければ CI 待ちを skip し「CI 未検出のため CI green チェックなし」を transcript にログする
+   （沈黙させない・ADR-018）。
 3. **専用ブランチ確認** — `main`/`master`/`develop` なら先に `/create-branch`（`rules/agents.md`
    の Pre-Implementation Branch Check）。develop 不在なら現作業ブランチ、protected なら新規分岐。
 4. **ハードストップ設定** — 未指定なら全行程の既定（遷移回数上限 ＋ 20ターン/30分）を提示し合意。
@@ -64,6 +67,13 @@ current_phase が goal_phase を越えるまで繰り返す:
    満たせば design gate ごとスキップして plan へ。vibing も同じ `design_needed` を使う（新基準は設けない）。
 7. **ゴールドリフト検知** — 各フェーズ境界で (a) 構造ゴール=goal_phase 到達、(b) 内容ゴール=確定要件
    への各成果の写像、の両方を確認。内容がズレたら新目標を作らず STOP・報告。
+8. **PR 作成後の CI 待ち（pr フェーズ・merge 前）** — `pr` の success_test には機械成分「remote CI green」が
+   ある（CI 実在時・起動時チェックで判定）。PR を push したら CI が起動するので、前進（full-auto は migrate へ）
+   または共有ブランチへの merge の前に `gh run watch <run-id> --exit-status`（または `gh pr checks <pr> --watch`）
+   で green を機械確認する。**green → 前進。赤 / タイムアウト / run 検出不能 → STOP・報告（fail-safe=停止）**。
+   これは「手続き＋機械チェック」で担保し物理層（hook）は無い（過大表示しない）。**vibing でもこの機械確認は
+   外れない**（vibing が外すのは PR 承認の事前確認＝人間ゲートだけ。正は `rules/autorun-flow.md`「Remote CI
+   green は pr の機械 success_test 成分」、`docs/adr/018-remote-ci-as-done-condition.md`）。
 
 ## ステップ 5: 停止と報告
 
@@ -74,6 +84,8 @@ current_phase が goal_phase を越えるまで繰り返す:
 ## 不可逆操作（loop-safety 準拠）
 
 - push / deploy / delete / 外部送信は自走中でも人間確認（関門 pr / deploy がこれを担う）。
+- 共有ブランチ（develop/main）への merge は **head の remote CI green を機械確認してから**行う（赤/未完了/検出不能は
+  停止・fail-safe）。CI 待ちは手続き＋機械チェックで担保し物理層は無い（ADR-018・`rules/loop-safety.md`）。
 - push / PR は **gh CLI（Bash）経由**で行い、物理層の `pr-base-checker.py` /
   `git-destructive-blocker.py` が効くようにする（MCP 経由は物理層が抜けるため避ける）。
 - **vibing 時（ADR-015）**: 巻き戻し**可能**な不可逆操作（PR push・auto-rollback 可能な deploy）の
@@ -88,3 +100,4 @@ current_phase が goal_phase を越えるまで繰り返す:
 - `skills/loop-engineering/SKILL.md` — tdd フェーズの実装部品（ミクロ層）
 - `docs/adr/007-autonomous-loop-execution.md` / `docs/adr/008-orchestration-declarative-flow.md` — 設計決定
 - `docs/adr/015-vibing-mode.md` — `--vibing` フラグと kind 降格（`resolve_kind`）の決定
+- `docs/adr/018-remote-ci-as-done-condition.md` — remote CI green を pr の機械 success_test 成分とする決定
