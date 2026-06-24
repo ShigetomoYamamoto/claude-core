@@ -30,12 +30,16 @@ The hook fires **only** on Bash and `Edit|Write|MultiEdit|NotebookEdit`. It does
 
 1. **Manual** — run `/model sonnet` in the main conversation; switch back with `/model opus`.
 2. **Delegation** — hand the edit/change to an execution agent via `Task`:
+   - `git-runner` — VCS / release execution (stage / commit / push / PR / branch / merge)
+   - `executor` — general edits / Bash outside any specialist's charter
    - `fixer` — code fixes / error handling
    - `tdd-guide` — test-driven development (tests + implementation)
    - `build-error-resolver` — build / type-error fixes
    - `e2e-runner` — Playwright E2E
 
    These agents declare `model: sonnet` (already 100% in place), so a delegated edit passes the guard's `agent_id` gate.
+
+   Do NOT delegate execution to the built-in `general-purpose` / `claude` agent: it inherits the parent (Opus) model, so it runs expensive and off-role (even though the `agent_id` gate would let it through). Use the dedicated `model: sonnet` runners above, or pass `model: sonnet` explicitly in the `Task` call.
 
 ## Tool operations
 
