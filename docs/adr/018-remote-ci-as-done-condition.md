@@ -1,6 +1,6 @@
 # ADR-018: pushed/merged 成果物の done-condition に remote CI green を含める
 
-**ステータス**: proposed
+**ステータス**: accepted（rules/autorun-flow.md・rules/loop-safety.md・commands/autorun.md へ反映済み。2026-07-04 にステータス更新）
 
 **日付**: 2026-06-24
 

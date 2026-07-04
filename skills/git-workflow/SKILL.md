@@ -32,7 +32,7 @@ description: Git workflow reference for commits, branching, and PRs. Covers Conv
 
 - description は**日本語**で「何をしたか」を端的に記述（50文字以内目安）
 - 変更の背景や理由が非自明な場合は body に補足する
-- Co-Authored-By 行は追加しない（Attribution disabled globally）
+- Co-Authored-By 行は追加しない（Claude Code 既定では付与されるため、各マシンの settings で `includeCoAuthoredBy: false` を設定して機械的に無効化する。未設定のマシンでは手動で外す）
 
 ### Example
 

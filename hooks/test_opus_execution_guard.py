@@ -5,7 +5,7 @@
       （または python3 hooks/test_opus_execution_guard.py）
 
 hook は PreToolUse で stdin から JSON を受け取り、
-メインループの Opus が Edit/Write/MultiEdit/NotebookEdit または
+メインループの思考ティアモデル(Opus/Fable/Mythos)が Edit/Write/MultiEdit/NotebookEdit または
 変更系 Bash を実行しようとした場合に exit 2 でブロックする。
 サブエージェント(agent_id あり)・Sonnet/Haiku・監視対象外ツールは通過させる。
 """
@@ -221,8 +221,33 @@ class OpusExecutionGuardTest(unittest.TestCase):
         t = self.make_transcript([opus_assistant("claude-opus-4-8")])
         proc = run_hook_full("Edit", {"file_path": "/tmp/x.py"}, t)
         self.assertEqual(proc.returncode, 2)
-        self.assertIn("Opus はファイル編集・変更系 Bash 操作を直接実行できません。", proc.stderr)
+        self.assertIn("思考ティアのモデル(Opus/Fable)はファイル編集・変更系 Bash 操作を直接実行できません。", proc.stderr)
         self.assertEqual(proc.stdout, "")
+
+    # --- ケース29: Fable + Edit → ブロック (ADR-020: 思考ティア拡張) ---
+    def test_29_fable_edit_blocked(self):
+        t = self.make_transcript([opus_assistant("claude-fable-5")])
+        self.assertEqual(run_hook("Edit", {"file_path": "/tmp/x.py"}, t), 2)
+
+    # --- ケース30: Fable + Bash git commit → ブロック (ADR-020) ---
+    def test_30_fable_bash_git_commit_blocked(self):
+        t = self.make_transcript([opus_assistant("claude-fable-5")])
+        self.assertEqual(run_hook("Bash", {"command": "git commit -m x"}, t), 2)
+
+    # --- ケース31: Mythos + Edit → ブロック (ADR-020) ---
+    def test_31_mythos_edit_blocked(self):
+        t = self.make_transcript([opus_assistant("claude-mythos-5")])
+        self.assertEqual(run_hook("Edit", {"file_path": "/tmp/x.py"}, t), 2)
+
+    # --- ケース32: Fable + Edit + agent_id あり → 通過 (サブエージェント委譲) ---
+    def test_32_fable_subagent_edit_allowed(self):
+        t = self.make_transcript([opus_assistant("claude-fable-5")])
+        self.assertEqual(run_hook("Edit", {"file_path": "/tmp/x.py"}, t, agent_id="agent-abc123"), 0)
+
+    # --- ケース33: Fable + Bash git status → 通過 (読み取り系) ---
+    def test_33_fable_bash_read_allowed(self):
+        t = self.make_transcript([opus_assistant("claude-fable-5")])
+        self.assertEqual(run_hook("Bash", {"command": "git status"}, t), 0)
 
 
 if __name__ == "__main__":

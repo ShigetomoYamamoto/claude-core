@@ -50,7 +50,7 @@ git diff develop...HEAD
 - シークレット・環境変数の参照
 - 決済・課金・個人情報の処理
 
-## ステップ 5: リモートへのプッシュ（未プッシュの場合）
+## ステップ 4: リモートへのプッシュ（未プッシュの場合）
 
 現在のブランチがリモートに存在しない、または未プッシュのコミットがある場合：
 
@@ -58,7 +58,7 @@ git diff develop...HEAD
 git push -u origin <current-branch>
 ```
 
-## ステップ 6: PRタイトルとDescription の生成
+## ステップ 5: PRタイトルとDescription の生成
 
 Description テンプレート・Summary/Test plan の書き方は `~/.claude/skills/git-workflow/SKILL.md` を参照すること。
 
@@ -68,11 +68,11 @@ Description テンプレート・Summary/Test plan の書き方は `~/.claude/sk
 - `type: 内容` 形式（Conventional Commits に準拠）
 - 日本語で記述
 
-## ステップ 7: PR作成前の確認
+## ステップ 6: PR作成前の確認
 
 生成したタイトルと Description をユーザーに提示して承認を得る。
 
-## ステップ 8: PR作成実行
+## ステップ 7: PR作成実行
 
 ```bash
 gh pr create \
@@ -101,7 +101,7 @@ EOF
 )"  # __VIBING_AUTORUN_PR__
 ```
 
-## ステップ 9: 完了報告
+## ステップ 8: 完了報告
 
 PR作成後、以下を表示する：
 
@@ -114,6 +114,6 @@ PR作成後、以下を表示する：
 ⚠️ **PRを作成する前に必ずタイトルと Description をユーザーに確認すること。**
 
 ⚠️ **base ブランチは常に `develop` とする。**（main / master へのダイレクトPRは行わない）
-唯一の例外は `/autorun --vibing` 実行時のステップ8 vibing 分岐（末尾マーカー付き `--base main`・ADR-015）。
+唯一の例外は `/autorun --vibing` 実行時のステップ7 vibing 分岐（末尾マーカー付き `--base main`・ADR-015）。
 
 ⚠️ **未コミットの変更がある場合は `/commit-commands:commit` を先に実行するよう案内すること。**

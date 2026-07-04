@@ -1,6 +1,6 @@
 # ADR-019: settings.json.template のスコープは FORCE 配線のみ（個人・DEFAULT キーは ~/.claude 側）
 
-**ステータス**: proposed
+**ステータス**: accepted（settings.json.template へ反映済み。2026-07-04 にステータス更新）
 
 **日付**: 2026-06-24
 
