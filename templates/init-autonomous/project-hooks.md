@@ -25,7 +25,7 @@ if os.path.exists(".claude/settings.json"):
 
 new_hook = {
     "matcher": "Edit|Write|MultiEdit",
-    "hooks": [{"type": "command", "command": "python3 .claude/hooks/debug-output-detector.py"}]
+    "hooks": [{"type": "command", "command": "bash -c 'for d in \"$CLAUDE_PROJECT_DIR\" \"$PWD\"; do p=\"$d/.claude/hooks/debug-output-detector.py\"; [ -n \"$d\" ] && [ -f \"$p\" ] && exec python3 \"$p\"; done; exit 0'"}]
 }
 
 hooks = existing.setdefault("hooks", {})
