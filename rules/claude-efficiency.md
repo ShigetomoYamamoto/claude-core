@@ -2,22 +2,25 @@
 
 ## Model Selection Strategy
 
-**Haiku 4.5** (90% of Sonnet capability, 3x cost savings):
+**Haiku 4.5** (fast & cheap):
 - Lightweight agents with frequent invocation
 - Pair programming and code generation
 - Worker agents in multi-agent systems
 
-**Sonnet 4.6** (Best coding model):
+**Sonnet (Sonnet 5 / 4.6)** (best coding cost/performance):
 - Main development work
 - Orchestrating multi-agent workflows
 - Complex coding tasks
 
-**Opus 4.8** (Deepest reasoning):
+**Opus 4.8** (deep reasoning):
 - Complex architectural decisions
-- Maximum reasoning requirements
 - Research and analysis tasks
 
-**Role separation:** Opus handles thinking (research, planning, decision-making); Sonnet/Haiku handle execution (editing, deletion, repeated operations). The automatic enforcement via `hooks/opus-execution-guard.py` is defined in `rules/role-separation.md`.
+**Fable 5 (Mythos-class, above Opus)** (deepest reasoning — use sparingly):
+- Hardest cross-cutting analysis that must fit one context (e.g. knowledge-base consolidation, system-wide design review)
+- Maximum-effort reasoning sessions
+
+**Role separation:** the thinking tier (Fable 5 / Opus) handles thinking (research, planning, decision-making); Sonnet/Haiku handle execution (editing, deletion, repeated operations). The automatic enforcement via `hooks/opus-execution-guard.py` is defined in `rules/role-separation.md` (guard scope: ADR-020).
 
 ## Context Window Management
 
