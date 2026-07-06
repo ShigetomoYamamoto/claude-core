@@ -1,5 +1,4 @@
 ---
-name: 検証ループ
 description: |
   コード変更を「レビュー→指摘の独立検証→修正→再レビュー」と、
   CRITICAL/HIGH が 0 になるか上限到達まで自律で回します（Workflow 使用）。

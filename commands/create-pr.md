@@ -1,18 +1,13 @@
 ---
-name: PR作成
 description: |
   現在のブランチと develop の差分を分析し、
   テンプレートに沿った Pull Request を gh コマンドで作成します。
-args:
-  - name: タイトルヒント
-    description: |
-      PRタイトルのヒントになる情報（任意）。
-      省略した場合はコミット履歴から自動生成します。
-      例: 「倉庫番ゲームの重なりバグ修正」
-    required: false
+argument-hint: [タイトルヒント]
 ---
 
 # PR作成手順
+
+> 引数「タイトルヒント」（任意）: PRタイトルのヒント。省略時はコミット履歴から自動生成する。
 
 ## ステップ 1: 現状確認
 
@@ -50,15 +45,7 @@ git diff develop...HEAD
 - シークレット・環境変数の参照
 - 決済・課金・個人情報の処理
 
-## ステップ 4: リモートへのプッシュ（未プッシュの場合）
-
-現在のブランチがリモートに存在しない、または未プッシュのコミットがある場合：
-
-```bash
-git push -u origin <current-branch>
-```
-
-## ステップ 5: PRタイトルとDescription の生成
+## ステップ 4: PRタイトルとDescription の生成
 
 Description テンプレート・Summary/Test plan の書き方は `~/.claude/skills/git-workflow/SKILL.md` を参照すること。
 
@@ -68,9 +55,18 @@ Description テンプレート・Summary/Test plan の書き方は `~/.claude/sk
 - `type: 内容` 形式（Conventional Commits に準拠）
 - 日本語で記述
 
-## ステップ 6: PR作成前の確認
+## ステップ 5: PR作成前の確認
 
 生成したタイトルと Description をユーザーに提示して承認を得る。
+
+## ステップ 6: リモートへのプッシュ（未プッシュの場合）
+
+**ステップ5の承認を得てから push する**（外向き操作を承認前に行わない）。
+現在のブランチがリモートに存在しない、または未プッシュのコミットがある場合：
+
+```bash
+git push -u origin <current-branch>
+```
 
 ## ステップ 7: PR作成実行
 
@@ -110,6 +106,8 @@ PR作成後、以下を表示する：
 - base ブランチ → head ブランチ
 
 ## 注意事項
+
+⚠️ **push はステップ5（タイトル・Description の承認）後に実行する。承認前にブランチを push しない。**
 
 ⚠️ **PRを作成する前に必ずタイトルと Description をユーザーに確認すること。**
 

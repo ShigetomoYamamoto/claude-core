@@ -124,7 +124,7 @@ Reason:      <error detail>
 - **Not in the `/autorun` transition table — by design.** Autonomous runs only do
   *auto*-rollback inside `deploy-runner` on verification failure. *Manual* rollback (this
   agent) is human-initiated (`/rollback` or the `rules/agents.md` trigger), so it is
-  intentionally outside `rules/autorun-flow.md`'s whitelist — not a gap.
+  intentionally outside `docs/autorun-flow.md`'s whitelist — not a gap.
 
 ## Coordination
 

@@ -4,7 +4,7 @@
 Design (why this is not a plain copy):
   ~/.claude mixes two kinds of content with opposite needs.
 
-  1. Static, repo-owned dirs (agents/commands/rules/skills/hooks/workflows).
+  1. Static, repo-owned dirs (agents/commands/rules/skills/hooks/workflows/docs).
      Never written by Claude at runtime -> linked as SYMLINKS to this repo, so a
      repo edit goes live immediately and `git pull` updates every machine. No
      `rm -rf` of real content, no copy drift.
@@ -39,7 +39,7 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parent
 CLAUDE_DIR = Path.home() / ".claude"
 
-STATIC_DIRS = ["agents", "commands", "rules", "skills", "hooks", "workflows", "templates"]
+STATIC_DIRS = ["agents", "commands", "rules", "skills", "hooks", "workflows", "templates", "docs"]
 
 # settings.json merge policy (see module docstring)
 FORCE_HOOK_EVENTS = ["PreToolUse", "PostToolUse"]

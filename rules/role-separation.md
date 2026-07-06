@@ -38,15 +38,15 @@ The hook fires **only** on Bash and `Edit|Write|MultiEdit|NotebookEdit`. It does
 
    These agents declare `model: sonnet` (already 100% in place), so a delegated edit passes the guard's `agent_id` gate.
 
-   Do NOT delegate execution to the built-in `general-purpose` / `claude` agent: it inherits the parent (Opus) model, so it runs expensive and off-role (even though the `agent_id` gate would let it through). Use the dedicated `model: sonnet` runners above, or pass `model: sonnet` explicitly in the `Task` call.
+   Do NOT delegate execution to the built-in `general-purpose` / `claude` agent: it inherits the parent (thinking-tier: Fable/Opus) model, so it runs expensive and off-role (even though the `agent_id` gate would let it through). Use the dedicated `model: sonnet` runners above, or pass `model: sonnet` explicitly in the `Task` call.
 
 ## Tool operations
 
 Browser automation and repeated MCP execution belong to Sonnet:
-- **Design** (how to drive it): Opus's judgment.
+- **Design** (how to drive it): the thinking tier's judgment.
 - **Execution** (running the steps): delegate to Sonnet, or `/model sonnet`.
 
-Example: design a complex Playwright scenario on Opus; run it and reproduce bugs on Sonnet.
+Example: design a complex Playwright scenario on the thinking tier (Fable/Opus); run it and reproduce bugs on Sonnet.
 
 ## loop-engineering note
 
