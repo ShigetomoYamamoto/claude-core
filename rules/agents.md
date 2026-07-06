@@ -33,10 +33,10 @@ These agents MUST be invoked automatically — without waiting for the user to a
 | Ready to deploy after PR merge | **deploy-runner** — deploy + verify + auto-rollback on failure |
 | Manual rollback needed after a previous deploy | **rollback-runner** — revert to a previous version |
 | PR has reviewer comments that need addressing | **review-responder** — implement requested changes and reply |
-| Main-loop Opus needs VCS/release ops (commit/push/PR/branch/merge) but is blocked by opus-execution-guard | **git-runner** — delegate the git/gh execution (Sonnet; passes the agent_id gate) |
-| Main-loop Opus needs a generic edit / Bash that no specialist owns but is blocked by opus-execution-guard | **executor** — residual execution worker (Sonnet) |
+| Main-loop thinking-tier model (Fable/Opus) needs VCS/release ops (commit/push/PR/branch/merge) but is blocked by opus-execution-guard | **git-runner** — delegate the git/gh execution (Sonnet; passes the agent_id gate) |
+| Main-loop thinking-tier model (Fable/Opus) needs a generic edit / Bash that no specialist owns but is blocked by opus-execution-guard | **executor** — residual execution worker (Sonnet) |
 
-> 自走時（`/autorun`）は `rules/autorun-flow.md` の遷移に従い、各エージェントがフェーズとして連結起動される（requirements→requirements-analyst, analyze-task→task-analyst, design→architect, plan→planner, tdd→loop-engineering, verify→/review-loop, deploy→deploy-runner 等）。上表のトリガー（コード変更時の即時レビュー等）はフェーズ内でなお有効。`/autorun --vibing` 時は方向ゲート（要件・条件付き設計）と巻き戻し不能操作以外の事前確認が外れる（[ADR-015](../docs/adr/015-vibing-mode.md)）が、各フェーズのエージェント連結とトリガーは同じ。
+> 自走時（`/autorun`）は `docs/autorun-flow.md` の遷移に従い、各エージェントがフェーズとして連結起動される（requirements→requirements-analyst, analyze-task→task-analyst, design→architect, plan→planner, tdd→loop-engineering, verify→/review-loop, deploy→deploy-runner 等）。上表のトリガー（コード変更時の即時レビュー等）はフェーズ内でなお有効。`/autorun --vibing` 時は方向ゲート（要件・条件付き設計）と巻き戻し不能操作以外の事前確認が外れる（[ADR-015](../docs/adr/015-vibing-mode.md)）が、各フェーズのエージェント連結とトリガーは同じ。
 
 > **公式プラグインへの委譲（2026-06-19〜・[ADR-012](../docs/adr/012-official-plugins-for-git-review-security.md)）:** 「危険操作は hooks で決定的に制御／振る舞いは公式に寄せる」方針。コードレビューは公式 `pr-review-toolkit`（`code-reviewer` ほか専門エージェント群）、コミット/ブランチ掃除は公式 `commit-commands`（`/commit-commands:commit`・`clean_gone`）、セキュリティは公式 `security-guidance`（編集時警告＋commit時LLMレビュー）に委譲。一方 `security-reviewer`・`reviewer`・`fixer`・`/create-pr` は公式に同等品が無い（または develop ベース強制 hook と衝突する）ため**自作を維持**する。危険操作の確定的ブロックは hooks（`git-destructive-blocker`・`pr-base-checker`・`git-add-secret-blocker`・`commit-msg-convention` ほか）が担う。
 

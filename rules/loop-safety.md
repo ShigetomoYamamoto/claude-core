@@ -125,16 +125,15 @@ Example: `/goal all tests in tests/auth pass and lint is clean, or stop after 15
 ## Gated multi-phase autonomous runs (`/autorun`)
 
 When `/autorun` runs a full pipeline (requirements → … → deploy/PR) per
-`rules/autorun-flow.md`, this rule applies:
+`docs/autorun-flow.md`, this rule applies:
 
 - **Gates (kind=gate)** = requirements, design, PR, deploy. These are the concrete
   application of "irreversible/outward-facing actions need confirmation" (PR/deploy)
   and "no machine test → keep a human" (requirements/design). Non-gate phases auto-connect.
-- **Stop only on the whitelist**: gates / hard stop / per-phase retry cap / goal reached /
-  startup precondition-or-verifiability failure / irreversible-op confirmation /
-  unrecoverable error / **remote CI red or not-yet-completed at a `pr`-advance or shared-branch
-  merge point** (machine success_test unmet; fail-safe = stop — not relaxed by `--vibing`,
-  ADR-018). Stopping anywhere else is a definition violation — detect and report it.
+- **Stop only on the whitelist** — the 8-item list in `docs/autorun-flow.md` "Whitelist of
+  places it may stop" is the single source (it includes **remote CI red / not-yet-completed**,
+  which is NOT relaxed by `--vibing`, ADR-018). Stopping anywhere else is a definition
+  violation — detect and report it.
 - **Hard stop is two-layer**: a per-phase budget (e.g. verify = 5 rounds) AND a whole-run
   budget (transition count + the session ceiling above). Either one triggers a stop.
 - **Goal drift is two-layer**: structural (reached `goal_phase` as planned) AND content
@@ -144,7 +143,7 @@ When `/autorun` runs a full pipeline (requirements → … → deploy/PR) per
   `git-destructive-blocker.py`) only fire on git/Bash-routed push/PR — NOT on deploy
   commands or MCP-routed push/PR. So push/PR must go through `gh` CLI (Bash); deploy's stop
   is gate + procedure only (no physical layer).
-- **With `--vibing` (ADR-015)**: `resolve_kind` (defined in `rules/autorun-flow.md`)
+- **With `--vibing` (ADR-015)**: `resolve_kind` (defined in `docs/autorun-flow.md`)
   demotes pr and reversible deploy to `auto`; the gates that remain are requirements,
   design (when `design_needed`), and the unrecoverable-op gates. The two-layer hard stop is
   unchanged except the whole-run transition cap is raised (full-auto=24 / support=14); the
