@@ -1,6 +1,6 @@
 ---
 name: git-workflow
-description: Git workflow reference for commits, branching, and PRs. Covers Conventional Commits format, branch naming conventions, and PR description templates.
+description: Git workflow reference for commits, branching, and PRs. Covers Conventional Commits format, branch naming conventions, and PR description templates. Reference only — execution belongs to /create-branch, /create-pr, and /commit-commands:commit.
 ---
 
 # Git Workflow Reference
@@ -27,6 +27,9 @@ description: Git workflow reference for commits, branching, and PRs. Covers Conv
 | `chore` | ビルド設定・依存関係などの雑務 |
 | `perf` | パフォーマンス改善 |
 | `ci` | CI/CD 設定の変更 |
+| `build` | ビルドシステム・外部依存の変更 |
+| `style` | フォーマットなど、コードの意味に影響しない変更 |
+| `revert` | 以前のコミットの取り消し |
 
 ### Rules
 

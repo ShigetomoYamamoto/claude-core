@@ -28,3 +28,10 @@ MANDATORY workflow:
 
 - **tdd-guide** - Use PROACTIVELY for new features, enforces write-tests-first
 - **e2e-runner** - Playwright E2E testing specialist
+
+## Scope note
+
+The sizing judge is `loop-engineering` STEP 0 (ADR-014): class C tasks (trivial /
+throwaway / no testable runtime surface) may skip the TDD loop with an explicit
+one-line notice. The mandate above applies to code changes with observable
+behavior (class A/B).

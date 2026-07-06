@@ -6,6 +6,7 @@ These rules apply whenever any agent performs git operations — not just when `
 
 ### Commits
 - **Always show the commit message to the user and get approval before committing.** Never commit silently.
+  - **適用注記（公式 `/commit-commands:commit` との関係・2026-07-06）**: ユーザー自身がこのコマンドを起動した場合、その起動をそのコミット1回分の承認とみなす（公式コマンドは実行中に確認テキストを出力しない設計のため）。エージェントが自発的にコミットする経路では本規範どおり事前承認が必要（自走中は下記 Autonomous-run exception の包括承認が根拠）。
 - Never stage `.env`, credential files, or any file matching `*.key`, `*.pem`, `*.secret`.
 - If changes span multiple unrelated purposes, split into separate commits.
 - Do not push after committing — the user pushes manually.

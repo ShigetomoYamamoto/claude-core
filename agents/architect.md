@@ -63,17 +63,22 @@ For each significant design decision, document:
 Design is a **direction judgment that cannot be machine-verified**, so it is a human
 gate: after presenting the design proposal, **WAIT for the user's explicit approval
 before anything downstream proceeds** — do not hand off to `planner` on your own.
-(Mirrors `requirements-analyst`; enforced as `design = gate` in `rules/autorun-flow.md`.)
+(Mirrors `requirements-analyst`; enforced as `design = gate` in `docs/autorun-flow.md`.)
 
-**Skip flag:** emit a clear "design needed?" verdict so the caller can skip this gate
-when it adds nothing. Design is *needed* only if any of these hold — otherwise output
-`design: not-needed` and let the flow auto-advance to `planner`:
+**Skip flag (owned upstream):** the `design_needed` verdict is produced at the
+requirements rung (`requirements-analyst`, from the four conditions below — the
+predicate set of `docs/autorun-flow.md` "design skip decision"). Under `/autorun`
+you are normally invoked only when that flag is true: **adopt the upstream verdict,
+do not re-derive it** (single judge, ADR-014). Only in standalone use with no
+upstream requirements do you derive the same four-condition verdict yourself —
+output `design: not-needed` when none holds and let the caller auto-advance to
+`planner`:
 - new/changed DB schema
 - new API contract / endpoint
 - tech-stack selection or change
 - a change to system boundaries or data flow
 
-See `rules/autorun-flow.md` "design skip decision" and ADR-014 (gates are derived, not placed).
+See `docs/autorun-flow.md` "design skip decision" and ADR-014 (gates are derived, not placed).
 
 ## Architectural Principles
 

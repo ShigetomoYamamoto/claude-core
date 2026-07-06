@@ -41,7 +41,7 @@ Claude Code のグローバル設定を管理する dotfiles リポジトリ。
 | 層 | 主な成果物 | 役割 |
 |----|-----------|------|
 | **ミクロ実装** | `skills/loop-engineering/`・`commands/review-loop`（+`reviewer`/`fixer`）・`workflows/loop-engineering-large-A.js` | 1タスクを VISION→テスト→レッド/グリーン→レビュー往復→完了判定で完成させる（強さ A/B/C を自動選択） |
-| **マクロ自走** | `rules/autorun-flow`（遷移定義）・`commands/autorun`（解釈）・`docs/adr/007`・`008` | 要件→設計→実装→PR/デプロイを、関門4点（要件・設計・PR・デプロイ）以外を autorun-flow の遷移表に従い自動連結 |
+| **マクロ自走** | `docs/autorun-flow`（遷移定義）・`commands/autorun`（解釈）・`docs/adr/007`・`008` | 要件→設計→実装→PR/デプロイを、関門4点（要件・設計・PR・デプロイ）以外を autorun-flow の遷移表に従い自動連結 |
 | **安全（横串）** | `rules/loop-safety.md` | 前提条件・ハードストップ・ゴールドリフト・不可逆操作確認（全層が参照する正本） |
 | **メモリ（横串）** | `rules/memory.md` | セッションを跨ぐ学習を `memory/` に書き戻す（アウターループ） |
 | **並列（横串）** | `rules/parallel-worktree.md` | 並列エージェントが書き込み競合する場合の worktree 分離 |
@@ -138,7 +138,7 @@ cd ~/dotfiles/claude-config
 
 ## 開発の進め方（規模別）
 
-`/autorun` が `rules/autorun-flow.md` の遷移に従い、**関門4点（要件・設計・PR・デプロイ）以外を自動連結**して自走します。タスクの規模で入口と通る段が変わります。
+`/autorun` が `docs/autorun-flow.md` の遷移に従い、**関門4点（要件・設計・PR・デプロイ）以外を自動連結**して自走します。タスクの規模で入口と通る段が変わります。
 
 ### 入口は3つ
 

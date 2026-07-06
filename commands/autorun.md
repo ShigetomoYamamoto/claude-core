@@ -1,13 +1,13 @@
 ---
-name: 自走モード
 description: |
   目的を渡すと autorun-flow.md の定義に従い、完了条件まで関門4点以外を自動連結して自走します。
   関門(要件確定/設計確定/PR作成/デプロイ)と不可逆操作でのみ人間が確認します。
+argument-hint: "[--vibing] <目的またはタスク/Issue>"
 ---
 
 # /autorun — 自走モード（関門付きフロー自走インタープリタ）
 
-目的を1つ渡すと、`rules/autorun-flow.md`（フロー定義）を解釈し、完了条件まで人間のコマンド
+目的を1つ渡すと、`docs/autorun-flow.md`（フロー定義）を解釈し、完了条件まで人間のコマンド
 打鍵なしでフェーズを自動連結する。関門4点と不可逆操作でのみ停止する。安全規律の正本は
 `rules/loop-safety.md`。
 
@@ -29,7 +29,7 @@ description: |
 6. **`--vibing` フラグ受理（任意）** — 付いていれば RUN_STATE.vibing=true。vibing は方向ゲート
    （要件・条件付き設計）と巻き戻し不能操作以外の事前確認を外すモード。起動時に「PR push と巻き戻し
    可能な deploy の事前確認を外す（巻き戻し不能操作は確認を残す）」旨を1回提示し合意を取る。降格規則・
-   ハードストップ値の正は `rules/autorun-flow.md`「vibing demotion rules」、安全規律は
+   ハードストップ値の正は `docs/autorun-flow.md`「vibing demotion rules」、安全規律は
    `rules/loop-safety.md` を参照（本コマンドに定義実体は置かない・ADR-015）。`--isolation`（任意の
    安全ダイヤル・既定 none）も受理する。
 
@@ -50,16 +50,16 @@ start / goal を取得する。`--vibing` は第3モードではなく、full-au
 
 current_phase が goal_phase を越えるまで繰り返す:
 
-1. `rules/autorun-flow.md` を読み、current_phase の行を引く。
+1. `docs/autorun-flow.md` を読み、current_phase の行を引く。
 2. 実行部品を起動する（GOAL 再掲・直前フェーズ成果・SCOPE をプリアンブルで明示的に渡す）。
-   - **tdd** フェーズは `skills/loop-engineering/`（ミクロ層）に委譲（渡した SCOPE を採用させ、STEP0 の A/B/C 再判定はさせない＝判断者1人。`rules/autorun-flow.md`「Scope handoff to the tdd phase」）。
+   - **tdd** フェーズは `skills/loop-engineering/`（ミクロ層）に委譲（渡した SCOPE を採用させ、STEP0 の A/B/C 再判定はさせない＝判断者1人。`docs/autorun-flow.md`「Scope handoff to the tdd phase」）。
    - **verify** フェーズは `/review-loop` に委譲。
 3. success_test を**機械的に実行**（Bash、結果を transcript 出力。自己申告で代替しない）。
 4. 偽なら: フェーズ内リトライ（tdd/verify は内部ループ、build エラーは build-error-resolver）。
    フェーズ内上限 or 膠着で STOP・報告。
 5. 真なら kind 分岐:
    - vibing 時は分岐の**直前に `resolve_kind(phase, RUN_STATE)` を適用**し、降格後の kind で分岐する
-     （導出規則の正は `rules/autorun-flow.md`「vibing demotion rules」。評価結果は transcript に出す）。
+     （導出規則の正は `docs/autorun-flow.md`「vibing demotion rules」。評価結果は transcript に出す）。
    - **auto** — 確認を取らず next へ自動遷移。commit フェーズは包括承認のもと自動（メッセージは提示）。
    - **gate** — 停止プロトコル（関門名・成果サマリ・次に進むと何が起きるか・承認/修正/中止を提示し
      **能動的にターン終了**）。承認後のみ next。承認は gates_passed に記録し次に持ち越さない。
@@ -72,7 +72,7 @@ current_phase が goal_phase を越えるまで繰り返す:
    または共有ブランチへの merge の前に `gh run watch <run-id> --exit-status`（または `gh pr checks <pr> --watch`）
    で green を機械確認する。**green → 前進。赤 / タイムアウト / run 検出不能 → STOP・報告（fail-safe=停止）**。
    これは「手続き＋機械チェック」で担保し物理層（hook）は無い（過大表示しない）。**vibing でもこの機械確認は
-   外れない**（vibing が外すのは PR 承認の事前確認＝人間ゲートだけ。正は `rules/autorun-flow.md`「Remote CI
+   外れない**（vibing が外すのは PR 承認の事前確認＝人間ゲートだけ。正は `docs/autorun-flow.md`「Remote CI
    green は pr の機械 success_test 成分」、`docs/adr/018-remote-ci-as-done-condition.md`）。
 
 ## ステップ 5: 停止と報告
@@ -95,7 +95,7 @@ current_phase が goal_phase を越えるまで繰り返す:
 
 ## 関連
 
-- `rules/autorun-flow.md` — フロー定義（本コマンドが解釈する正）
+- `docs/autorun-flow.md` — フロー定義（本コマンドが解釈する正）
 - `rules/loop-safety.md` — 安全規律の正本
 - `skills/loop-engineering/SKILL.md` — tdd フェーズの実装部品（ミクロ層）
 - `docs/adr/007-autonomous-loop-execution.md` / `docs/adr/008-orchestration-declarative-flow.md` — 設計決定

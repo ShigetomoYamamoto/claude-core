@@ -1,5 +1,7 @@
 # Autorun Flow — Declarative Flow Definition (the autonomous transition table)
 
+> 置き場所: 本定義は [ADR-022](./adr/022-autorun-flow-out-of-always-loaded-rules.md) により `rules/`（常時ロード）から `docs/`（オンデマンド参照）へ移動した。ランタイム参照パスは `~/.claude/docs/autorun-flow.md`（install.py が docs/ を symlink）。内容・正本性は不変。
+
 The single source of truth for the *shape* of the full pipeline, read by the
 `/autorun` interpreter. It holds no execution logic — only **which phases run, in
 what order, and where to stop**. Each phase's body is handled by existing commands /
