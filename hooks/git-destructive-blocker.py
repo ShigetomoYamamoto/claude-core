@@ -2,17 +2,49 @@
 """PreToolUse(Bash): git の破壊的操作をブロックする"""
 import json, sys, re, subprocess
 
-def current_branch():
+def _strip_quotes(s):
+    return s.strip('\'"')
+
+def resolve_git_dir(cmd):
+    """cmd 文字列から「git が実際に走るディレクトリ」を推定する。
+    (1) `git -C <dir>` があればその <dir>。
+    (2) 無ければ、最初の git 実行箇所より前に現れる最後の `cd <dir>`。
+    (3) どちらも無ければ None（呼び出し側はプロセス cwd にフォールバックする）。
+    push 先ブランチの評価は行わない（スコープ外）。「保護ブランチ上に居るか」を
+    評価する場所を cwd から正しいディレクトリへ正すだけ。"""
+    m = re.search(r'\bgit\s+-C\s+(\S+)', cmd)
+    if m:
+        return _strip_quotes(m.group(1))
+
+    invocation = re.search(r'(?:^|&&|\|\||;|\n)\s*(?:\S+\s+)*(git\s+\S+)', cmd, re.MULTILINE)
+    if not invocation:
+        return None
+
+    prefix = cmd[:invocation.start(1)]
+    cd_matches = list(re.finditer(r'\bcd\s+(\S+)', prefix))
+    if not cd_matches:
+        return None
+    return _strip_quotes(cd_matches[-1].group(1))
+
+def current_branch(cmd=''):
+    """cmd から推定した実行ディレクトリ（無ければプロセス cwd）でカレントブランチを返す。
+    判定不能・git 失敗時は空文字を返し、PROTECTED 非該当＝許可という従来挙動を保つ。"""
+    git_dir = resolve_git_dir(cmd) if cmd else None
     try:
-        r = subprocess.run(['git', 'branch', '--show-current'], capture_output=True, text=True, timeout=5)
+        base = ['git']
+        if git_dir:
+            base += ['-C', git_dir]
+        base += ['branch', '--show-current']
+        r = subprocess.run(base, capture_output=True, text=True, timeout=5)
         return r.stdout.strip()
     except Exception:
         return ''
 
 def is_git_invocation(cmd, subcmd):
     """git <subcmd> がシェル演算子の直後か行頭にある（実際に実行される）か判定する。
-    grep/echo/python -c 等の引数内に含まれる場合は除外する。"""
-    pattern = rf'(?:^|&&|\|\||;|\n)\s*(?:\S+\s+)*git\s+{re.escape(subcmd)}\b'
+    grep/echo/python -c 等の引数内に含まれる場合は除外する。`git -C <dir> <subcmd>`
+    のように git と subcmd の間に -C <dir> が挟まる形も subcmd の実行として認識する。"""
+    pattern = rf'(?:^|&&|\|\||;|\n)\s*(?:\S+\s+)*git\s+(?:-C\s+\S+\s+)?{re.escape(subcmd)}\b'
     return bool(re.search(pattern, cmd, re.MULTILINE))
 
 try:
@@ -33,7 +65,7 @@ try:
 
     # git commit on protected branch
     if is_git_invocation(cmd, 'commit'):
-        branch = current_branch()
+        branch = current_branch(cmd)
         if branch in PROTECTED:
             print(f'🔴 保護されたブランチ "{branch}" 上でコミットしようとしました。')
             print('作業ブランチを作成してから作業してください。')
@@ -43,7 +75,7 @@ try:
 
     # git push (non-force) on protected branch
     if is_git_invocation(cmd, 'push') and not re.search(r'(?:-f\b|--force\b|--force-with-lease\b)', cmd):
-        branch = current_branch()
+        branch = current_branch(cmd)
         if branch in PROTECTED:
             # ブランチ削除系 push（--delete / -d / コロン refspec ":branch"）は、
             # 削除対象が保護ブランチでなければ許可する。マージ済みブランチの掃除を
