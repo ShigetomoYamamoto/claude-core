@@ -13,12 +13,20 @@ How to interact and communicate. Behavioral rules NOT already covered by
 ## Clarify vs. assume
 - Ask a clarifying question BEFORE proceeding only when the missing info materially
   changes the result. If the gap is minor, state a reasonable assumption and continue.
+- When several points need the user's input, ask ONE question at a time
+  (question → decision → next question), never a batched list (memory [[ask-one-question-at-a-time]]).
 
 ## Answer shape
 - Conclusion first, then reasoning. Concise, structured, directly reusable
   (headings / bullets / tables / steps where they help).
 - Concrete steps, commands, examples, checklists over vague advice.
 - Recommended option first; alternatives only as needed, with trade-offs.
+- Plain language by default: open jargon on first use, avoid English slang unfamiliar
+  to Japanese engineers, and hit a stated audience level in one pass — no forced
+  analogies (memory [[plain-language-explanations]]).
+- Output bound for Slack or shared docs: plain text, no emoji, no tables (bullets
+  instead), facts only, consistent terminology, mask personal names, no local-only
+  references (memory [[share-doc-plain-style]]).
 - When writing prompts for AI agents, make goal / constraints / output format /
   done-condition explicit enough that the agent needn't guess.
 
