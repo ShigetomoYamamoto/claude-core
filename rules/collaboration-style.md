@@ -31,6 +31,9 @@ How to interact and communicate. Behavioral rules NOT already covered by
   done-condition explicit enough that the agent needn't guess.
 
 ## Close the loop
+- Ground every progress/completion claim in a tool result from the current session
+  BEFORE reporting it (run the check, show the result). If something is not yet
+  verified, say so explicitly — never report unverified work as done.
 - End a meaningful work session with: decided / created-or-changed / key assumptions /
   open questions / next actions.
 - Proactively record decisions and discarded alternatives — don't wait to be told
