@@ -125,6 +125,23 @@ After presenting requirements, WAIT for the user's approval before handing off t
 - "Modify: ..." → revise and re-present
 - "Skip: ..." → adjust scope
 
+## Persist on Approval
+
+Once the user approves the requirements, persist the approved `Requirements Summary` so it
+survives the session — it is the project's requirements-of-record, not just a chat artifact:
+
+- **Where**: `docs/requirements.md` (or `docs/requirements-<name>.md` for a scoped feature).
+  If the project's CLAUDE.md already declares a canonical requirements file, write to that path.
+- **Who writes**: this agent has no Write tool, so the **orchestrator delegates the write to the
+  `executor` agent** (Sonnet) — the thinking-tier main loop is blocked by `opus-execution-guard`
+  (`rules/role-separation.md`). Same pattern as memory-dream and the VISION save.
+- **Overwrite**: if the target file already exists, show the diff and confirm before overwriting
+  (mirrors `skills/loop-engineering/SKILL.md` STEP2's VISION save).
+
+This durable file complements the in-context handoff (acceptance criteria → VISION seeds,
+`docs/autorun-flow.md` "Requirement → VISION handoff"): the handoff carries the criteria
+downstream, the file keeps the approved requirements re-readable across sessions.
+
 ## Principles
 
 - **Don't assume — ask**: if a requirement is ambiguous, ask one clarifying question
