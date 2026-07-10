@@ -24,21 +24,8 @@ Persist a memory when something would otherwise have to be re-learned:
 
 ## What NOT to write
 
-- Anything already recorded in code, tests, ADRs, CLAUDE.md, or git history.
-- One-off details that only mattered to a single conversation.
 - Secrets or credentials — never (see `rules/security.md`).
-
-If asked to remember something the repo already records, capture only what was
-*non-obvious* about it.
-
-## How to write
-
-Follow the official auto-memory format (the session prompt is authoritative). The
-points that still matter for *our* workflow:
-
-- Before saving, check for an existing file that covers it — update rather than duplicate.
-- Delete memories that turn out to be wrong.
-- Convert relative dates to absolute ("today" -> the actual date).
+- Everything else the official auto-memory prompt already excludes (repo-recorded facts, one-off details).
 
 ## When to write (in a loop)
 

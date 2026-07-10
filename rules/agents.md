@@ -44,27 +44,7 @@ These agents MUST be invoked automatically — without waiting for the user to a
 
 ## Parallel Task Execution
 
-ALWAYS use parallel Task execution for independent operations:
+Independent operations run as parallel Task calls (the harness default).
 
-```markdown
-# GOOD: Parallel execution
-Launch 3 agents in parallel:
-1. Agent 1: Security analysis of auth.ts
-2. Agent 2: Performance review of cache system
-3. Agent 3: Type checking of utils.ts
-
-# BAD: Sequential when unnecessary
-First agent 1, then agent 2, then agent 3
-```
-
-> Read-only fan-out (above) shares the working tree. Concurrent **writers** must each
+> Read-only fan-out shares the working tree. Concurrent **writers** must each
 > run in an isolated worktree — see `rules/parallel-worktree.md`.
-
-## Multi-Perspective Analysis
-
-For complex problems, use split role sub-agents:
-- Factual reviewer
-- Senior engineer
-- Security expert
-- Consistency reviewer
-- Redundancy checker
