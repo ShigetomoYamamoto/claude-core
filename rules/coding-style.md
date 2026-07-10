@@ -12,18 +12,6 @@ MANY SMALL FILES > FEW LARGE FILES:
 - Extract utilities from large modules
 - Organize by feature/domain, not by type
 
-## Error Handling
-
-ALWAYS handle errors comprehensively:
-- Catch errors at boundaries (API handlers, async tasks)
-- Log with sufficient context for debugging
-- Re-throw with user-friendly messages
-- Never swallow errors silently
-
-## Input Validation
-
-ALWAYS validate user input at system boundaries (API endpoints, form submissions, external data). Use schema validation libraries available in the project's language over manual checks.
-
 ## Code Quality Checklist
 
 Before marking work complete:
