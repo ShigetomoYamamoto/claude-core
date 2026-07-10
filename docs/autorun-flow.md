@@ -140,6 +140,11 @@ with a stable ID). This keeps the loop closed top-to-bottom: the thing the human
 the gate is the same thing the machine checks at the bottom. loop-engineering adopts these
 rather than re-eliciting them (see `skills/loop-engineering/SKILL.md` STEP2; ADR-014).
 
+Besides the in-context seed, the **approved requirements are persisted to `docs/requirements.md`**
+(the orchestrator delegates the write to `executor`; requirements-analyst has no Write tool) so a
+full-auto run on a fresh project still leaves a durable requirements-of-record, not only an
+in-context artifact. See `agents/requirements-analyst.md` "Persist on Approval".
+
 ## Mechanical verifiability check (at startup)
 
 At `/autorun` startup, detect via Bash whether every auto phase's success_test is
