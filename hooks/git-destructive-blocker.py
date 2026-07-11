@@ -73,21 +73,46 @@ try:
             print('  git checkout -b <prefix>/<summary>_YYYYMMDD')
             sys.exit(2)
 
-    # git push (non-force) on protected branch
+    # git push (non-force)
     if is_git_invocation(cmd, 'push') and not re.search(r'(?:-f\b|--force\b|--force-with-lease\b)', cmd):
+        # ブランチ削除系 push（--delete / -d / コロン refspec ":branch"）は、削除先 ref が
+        # 保護ブランチかどうかで判定する。本質は「現在ブランチ」ではなく「削除先」なので、
+        # 現在ブランチが保護ブランチか否かに依存せず常に評価する（非保護の作業ブランチから
+        # `git push origin --delete develop` が素通りしていた穴を塞ぐ）。
+        is_delete = bool(re.search(r'--delete\b|(?:^|\s)-d\b|\s:\S', cmd))
+        if is_delete:
+            def _is_protected_ref(ref):
+                # git の ref DWIM 解決に合わせ、先頭の refs/heads/ ・ heads/ を正規化する
+                # (heads/develop も git は refs/heads/develop に解決するため保護対象)。
+                ref = _strip_quotes(ref)
+                ref = re.sub(r'^(?:refs/)?heads/', '', ref).strip('/')
+                return any(ref == b or ref.startswith(b + '/') for b in PROTECTED)
+            # 削除対象トークンを安全な ref 名文字種 [A-Za-z0-9._/-] に限定する。それ以外の文字
+            # （コマンド置換 $()・変数 $VAR・バックティック・クォート・バックスラッシュ・glob 等の
+            # 展開/難読化）を含むトークンは fail-safe でブロックする。
+            SAFE_REF = re.compile(r'^[A-Za-z0-9._/-]+$')
+            targets = []
+            for tok in re.split(r'\s+', cmd):
+                t = _strip_quotes(tok)
+                if not t or t.startswith('-'):
+                    continue
+                if ':' in t:                 # :branch / src:dst の削除は dst を対象にする
+                    t = t.split(':', 1)[1]
+                    if not t:
+                        continue
+                if not SAFE_REF.match(t):
+                    print('🔴 削除対象の ref 名を解決できません（展開・特殊文字を含む push --delete）。')
+                    print('保護ブランチ削除の取りこぼしを防ぐため、手動で確認してから実行してください。')
+                    sys.exit(2)
+                targets.append(t)
+            if any(_is_protected_ref(t) for t in targets):
+                print('🔴 保護されたブランチを削除しようとしました。')
+                print('保護ブランチ（main / master / develop 等）の削除は禁止です。')
+                sys.exit(2)
+            sys.exit(0)  # 非保護ブランチの削除は許可（現在ブランチに依存しない）
+        # 非削除の push: 保護ブランチ上からの直接 push を禁止する
         branch = current_branch(cmd)
         if branch in PROTECTED:
-            # ブランチ削除系 push（--delete / -d / コロン refspec ":branch"）は、
-            # 削除対象が保護ブランチでなければ許可する。マージ済みブランチの掃除を
-            # 保護ブランチ上からでも通すための例外（誤検知の解消）。非保護ブランチの
-            # 削除は元々作業ブランチ上では許可されており、ここは挙動を一貫させるだけ。
-            is_delete = bool(re.search(r'--delete\b|(?:^|\s)-d\b|\s:\S', cmd))
-            if is_delete:
-                if any(re.search(rf'\b{re.escape(b)}\b', cmd) for b in PROTECTED):
-                    print('🔴 保護されたブランチを削除しようとしました。')
-                    print('保護ブランチ（main / master / develop 等）の削除は禁止です。')
-                    sys.exit(2)
-                sys.exit(0)  # 非保護ブランチの削除は許可
             print(f'🔴 保護されたブランチ "{branch}" から直接 push しようとしました。')
             print('作業ブランチから PR を作成してください。')
             print('  /create-branch → 実装 → /create-pr の手順で進めてください。')

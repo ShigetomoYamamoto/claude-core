@@ -92,6 +92,149 @@ class GitDestructiveBlockerTest(unittest.TestCase):
         _run(["git", "checkout", "-b", "feature/x"], self.repo)
         self.assertEqual(run_hook("git push", self.repo), 0)
 
+    # --- 削除系 push: ref 名を静的に確定できない難読化は fail-safe でブロック（HIGH 回帰修正） ---
+    def test_push_delete_with_command_substitution_blocked(self):
+        # $(echo main) はシェル実行時に main へ展開されるが、静的解析ではトークンが
+        # 割れて "main" と完全一致しない -> フォールバックで許可してしまうと保護ブランチ
+        # 削除の取りこぼしになるため fail-safe でブロックする。
+        self.assertEqual(
+            run_hook("git push origin --delete $(echo main)", self.repo), 2
+        )
+
+    def test_push_delete_with_backtick_blocked(self):
+        self.assertEqual(
+            run_hook("git push origin --delete `echo develop`", self.repo), 2
+        )
+
+    def test_push_delete_with_split_quote_blocked(self):
+        # ma"in" はシェルが結合すると main になるが、静的には "in" のみが
+        # ターゲットとして解析され保護ブランチと一致しなくなる -> fail-safe でブロック。
+        self.assertEqual(
+            run_hook('git push origin --delete ma"in"', self.repo), 2
+        )
+
+    def test_push_delete_non_protected_multi_branch_still_allowed(self):
+        # メタ文字を含まない複数ブランチの削除は、これまでどおり誤検知なく許可される
+        # （false-positive 修正の回帰確認）。
+        self.assertEqual(
+            run_hook(
+                "git push origin --delete feat/a fix/b refactor/c", self.repo
+            ),
+            0,
+        )
+
+    # --- whitelist 化: blacklist 実装が取りこぼしていたケース ---
+    def test_push_delete_with_backslash_blocked(self):
+        # blacklist 実装（$()/`/quote のみ検査）はバックスラッシュを検査しておらず、
+        # ma\in のようなトークンをすり抜けさせていた。whitelist ([A-Za-z0-9._/-]) では
+        # 許容文字外のためブロックされる。
+        self.assertEqual(
+            run_hook(r"git push origin --delete ma\in", self.repo), 2
+        )
+
+    def test_push_delete_with_glob_blocked(self):
+        # blacklist 実装は glob (*) も検査しておらず、m*in は _is_protected_ref とも
+        # 完全一致しないため誤って許可されていた（実質的なバイパス）。whitelist では
+        # 許容文字外のためブロックされる。
+        self.assertEqual(
+            run_hook("git push origin --delete m*in", self.repo), 2
+        )
+
+    def test_push_delete_protected_branch_plain_blocked(self):
+        self.assertEqual(
+            run_hook("git push origin --delete develop", self.repo), 2
+        )
+
+    def test_push_delete_protected_branch_with_extra_token_blocked(self):
+        self.assertEqual(
+            run_hook("git push origin --delete main feat/x", self.repo), 2
+        )
+
+    def test_push_delete_colon_refspec_protected_blocked(self):
+        self.assertEqual(
+            run_hook("git push origin :release", self.repo), 2
+        )
+
+    def test_push_delete_normal_name_with_dot_underscore_allowed(self):
+        # ドット/アンダースコア/スラッシュ/ハイフンを含む正常な ref 名は whitelist を
+        # 通過し、これまでどおり許可される。
+        self.assertEqual(
+            run_hook("git push origin --delete feat/a_b.c-d", self.repo), 0
+        )
+
+    def test_push_direct_to_protected_branch_blocked(self):
+        # 削除系ではない直接 push は従来どおりブロックされる（回帰確認）。
+        self.assertEqual(
+            run_hook("git push origin develop", self.repo), 2
+        )
+
+    # --- heads/ プレフィックス正規化: git の DWIM 解決に合わせて保護ブランチ判定する ---
+    def test_push_delete_heads_prefixed_protected_blocked(self):
+        # git は heads/develop も refs/heads/develop に解決するため、旧実装
+        # (refs/heads/ のみ除去) だとすり抜けて実 git 側で develop が削除されうる。
+        self.assertEqual(
+            run_hook("git push origin --delete heads/develop", self.repo), 2
+        )
+
+    def test_push_delete_heads_prefixed_main_blocked(self):
+        self.assertEqual(
+            run_hook("git push origin --delete heads/main", self.repo), 2
+        )
+
+    def test_push_delete_colon_refspec_heads_prefixed_blocked(self):
+        self.assertEqual(
+            run_hook("git push origin :heads/develop", self.repo), 2
+        )
+
+    def test_push_delete_refs_heads_prefixed_protected_blocked(self):
+        # refs/heads/ プレフィックスの除去は旧実装から維持されていることの回帰確認。
+        self.assertEqual(
+            run_hook("git push origin --delete refs/heads/develop", self.repo), 2
+        )
+
+    def test_push_delete_branch_containing_heads_substring_allowed(self):
+        # "heads" を含むが heads/ プレフィックスではないブランチ名は誤ブロックしない。
+        self.assertEqual(
+            run_hook("git push origin --delete feat/heads-up", self.repo), 0
+        )
+
+    def test_push_delete_heads_prefixed_non_protected_allowed(self):
+        # heads/ を正規化した結果が非保護ブランチ名であれば引き続き許可する。
+        self.assertEqual(
+            run_hook("git push origin --delete heads/feature", self.repo), 0
+        )
+
+    # --- 削除ゲートは現在ブランチに依存しない（HIGH 回帰修正） ---
+    # 削除判定の本質は「削除先 ref」であって「現在立っているブランチ」ではない。
+    # 現在ブランチを非保護（feature/x）にした上で保護ブランチの削除を試み、
+    # それでもブロックされることを確認する。
+    def test_push_delete_protected_branch_blocked_from_non_protected_current_branch(self):
+        _run(["git", "checkout", "-b", "feature/x"], self.repo)
+        self.assertEqual(
+            run_hook("git push origin --delete develop", self.repo), 2
+        )
+
+    def test_push_delete_main_blocked_from_non_protected_current_branch(self):
+        _run(["git", "checkout", "-b", "feature/x"], self.repo)
+        self.assertEqual(
+            run_hook("git push origin --delete main", self.repo), 2
+        )
+
+    def test_push_delete_non_protected_branch_allowed_from_non_protected_current_branch(self):
+        # 現在ブランチも削除対象も非保護なら、これまでどおり許可される。
+        _run(["git", "checkout", "-b", "feature/x"], self.repo)
+        self.assertEqual(
+            run_hook("git push origin --delete feat/obsolete", self.repo), 0
+        )
+
+    def test_push_direct_to_protected_branch_allowed_from_non_protected_current_branch(self):
+        # 削除系ではない直接 push は、従来どおり「現在ブランチ」で判定する
+        # （現在ブランチが非保護なら push 先ブランチ名に develop を含んでいても許可）。
+        _run(["git", "checkout", "-b", "feature/x"], self.repo)
+        self.assertEqual(
+            run_hook("git push origin develop", self.repo), 0
+        )
+
     # --- 本丸: cd / -C で別ディレクトリに移ってから git を実行するケース ---
     def test_cd_to_feature_worktree_before_push_allowed(self):
         worktree = os.path.join(self.tmpdir, "wt-feat")
