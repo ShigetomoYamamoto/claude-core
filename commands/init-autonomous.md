@@ -203,7 +203,7 @@ new_servers = {
     # "playwright": {
     #     "type": "stdio",
     #     "command": "npx",
-    #     "args": ["@playwright/mcp@latest"],
+    #     "args": ["@playwright/mcp@0.0.76"],
     #     "env": {}
     # },
 }
