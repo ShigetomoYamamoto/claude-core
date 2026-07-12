@@ -1,0 +1,18 @@
+{
+  "env": { "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1" },
+  "permissions": { "defaultMode": "auto" },
+  "hooks": {
+    "PreToolUse": [
+      { "matcher": "Edit|Write|MultiEdit|NotebookEdit", "hooks": [ { "type": "command", "command": "python3 __TARGET__/hooks/opus-execution-guard.py" } ] },
+      { "matcher": "Write", "hooks": [ { "type": "command", "command": "python3 __TARGET__/hooks/doc-blocker.py" } ] },
+      { "matcher": "Bash", "hooks": [
+        { "type": "command", "command": "python3 __TARGET__/hooks/mass-delete-blocker.py" },
+        { "type": "command", "command": "python3 __TARGET__/hooks/git-add-secret-blocker.py" },
+        { "type": "command", "command": "python3 __TARGET__/hooks/opus-execution-guard.py" }
+      ] }
+    ],
+    "PostToolUse": [
+      { "matcher": "Edit|Write|MultiEdit", "hooks": [ { "type": "command", "command": "python3 __TARGET__/hooks/secret-detection.py" } ] }
+    ]
+  }
+}

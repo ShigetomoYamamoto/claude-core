@@ -1,5 +1,14 @@
 # claude-config 要件定義
 
+> **本リポジトリは claude-core foundation です（[ADR-023](./adr/023-three-foundation-split.md)）。**
+> 単一設定を core / engineering / work-agent の3 foundation に分割した結果、この要件定義の
+> 大部分（開発フロー A・品質ガード B の大半・プロジェクト初期化 D・マルチマシン同期 E の
+> symlink 前提）は claude-engineering foundation 側の要件に相当し、まだ core 向けに
+> 分割・書き直しできていません（follow-up）。core としての要件は「安全装置 C の中立部分
+> （シークレット検出・大量削除確認・opus-execution-guard）」「Claude 使用効率化」
+> 「マルチマシン同期は copy 型インストーラ（`installer.py`/`install.py`、symlink 廃止）」
+> に限定されます。詳細な資産分類は [`docs/migration/inventory.md`](./migration/inventory.md) を参照。
+
 ## 1. 上位目的（要望）
 
 人間の開発業務を Claude Code が肩代わり・サポートする。
@@ -30,6 +39,20 @@
 ---
 
 ## 2. 機能要件
+
+> **以下 A〜E は分割前（single-repo 時代）の全体要件をそのまま保持した履歴record。**
+> [ADR-023](./adr/023-three-foundation-split.md) 以降、**A（開発フローの提供）**・
+> **D（プロジェクト初期化）**・**E（マルチマシン同期の symlink 前提部分）** は
+> **claude-engineering foundation** 側の要件に相当し、この repo（claude-core）は所有しない。
+> **B（品質ガード）** も大半（TDD 強制・コードレビュー・ビルド修正・リファクタ等）が同様に
+> engineering 側だが、「Claude 使用効率化」（`rules/claude-efficiency.md`）だけは core が継続所有する。
+> **C（安全装置）** はシークレット検出・大量削除確認・opus-execution-guard・doc-blocker という
+> 中立部分のみ core、それ以外（git 破壊操作防止・PR base チェック等）は engineering。
+> core としての要件の実体は「ドメイン中立 rules（answer-only・collaboration-style・
+> claude-efficiency・memory・role-separation・safety-irreversible・secret-hygiene）＋
+> 上記安全 hook の中立部分＋ copy 型インストーラ（`installer.py`/`install.py`、symlink 廃止）」に
+> 限定される（詳細な資産分類は [`docs/migration/inventory.md`](./migration/inventory.md)）。
+> 以下は書き換えず、分割前の記録としてそのまま残す（新規要件は捏造しない）。
 
 ### A. 開発フローの提供
 
@@ -129,6 +152,14 @@
 ---
 
 ## 3. 非機能要件
+
+> **以下 3〜5 も分割前の全体要件をそのまま保持した履歴record。** `setup.sh` / `mcp.json` /
+> GitHub MCP・PAT・Keychain 連携、および `commands`/`agents` のファイルサイズ上限は
+> claude-engineering 側の要件に相当し、この repo は所有しない。core が継続所有するのは
+> hook の `exit 0`/`exit 2` 方針・シークレット衛生・`rules`/`hooks`/`skills` のファイルサイズ上限・
+> `install.py` の dry-run/ログ方針など、実際に core が持つ仕組みに対応する行のみ
+> （分類は [`docs/migration/inventory.md`](./migration/inventory.md)）。書き換えず、
+> 分割前の記録としてそのまま残す。
 
 ### 信頼性
 

@@ -24,7 +24,7 @@ Persist a memory when something would otherwise have to be re-learned:
 
 ## What NOT to write
 
-- Secrets or credentials — never (see `rules/security.md`).
+- Secrets or credentials — never (see `rules/secret-hygiene.md`).
 - Everything else the official auto-memory prompt already excludes (repo-recorded facts, one-off details).
 
 ## When to write (in a loop)
@@ -35,6 +35,7 @@ Persist a memory when something would otherwise have to be re-learned:
 
 ## Relation to other rules
 
-- `rules/loop-safety.md` — the run itself (inner loop + hard stops).
-- `rules/parallel-worktree.md` — isolating concurrent writers.
+- `rules/safety-irreversible.md` — the run itself (inner loop + hard stops).
+- Engineering-specific worktree isolation and loop discipline (concurrent writers,
+  git-workflow loop mechanics) live in the claude-engineering foundation, not here.
 - This file — carrying lessons *across* runs (the outer loop).
