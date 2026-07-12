@@ -28,17 +28,16 @@ The hook fires **only** on Bash and `Edit|Write|MultiEdit|NotebookEdit`. It does
 ## Two ways to switch to execution
 
 1. **Manual** — run `/model sonnet` in the main conversation; switch back with `/model fable` (or `/model opus`).
-2. **Delegation** — hand the edit/change to an execution agent via `Task`:
-   - `git-runner` — VCS / release execution (stage / commit / push / PR / branch / merge)
-   - `executor` — general edits / Bash outside any specialist's charter
-   - `fixer` — code fixes / error handling
-   - `tdd-guide` — test-driven development (tests + implementation)
-   - `build-error-resolver` — build / type-error fixes
-   - `e2e-runner` — Playwright E2E
+2. **Delegation** — hand the edit/change to a Sonnet subagent via `Task` (or pass
+   `model: sonnet` explicitly in the `Task` call). A subagent declaring `model: sonnet`
+   passes the guard's `agent_id` gate. The concrete engineering execution agents
+   (`git-runner`, `executor`, `fixer`, `tdd-guide`, `build-error-resolver`, `e2e-runner`)
+   live in the claude-engineering foundation, not here.
 
-   These agents declare `model: sonnet` (already 100% in place), so a delegated edit passes the guard's `agent_id` gate.
-
-   Do NOT delegate execution to the built-in `general-purpose` / `claude` agent: it inherits the parent (thinking-tier: Fable/Opus) model, so it runs expensive and off-role (even though the `agent_id` gate would let it through). Use the dedicated `model: sonnet` runners above, or pass `model: sonnet` explicitly in the `Task` call.
+   Do NOT delegate execution to the built-in `general-purpose` / `claude` agent: it
+   inherits the parent (thinking-tier: Fable/Opus) model, so it runs expensive and
+   off-role (even though the `agent_id` gate would let it through). Use a dedicated
+   `model: sonnet` subagent instead.
 
 ## Tool operations
 
@@ -48,14 +47,19 @@ Browser automation and repeated MCP execution belong to Sonnet:
 
 Example: design a complex Playwright scenario on the thinking tier (Fable/Opus); run it and reproduce bugs on Sonnet.
 
-## loop-engineering note
+## loop-engineering note (engineering foundation only)
 
-`skills/loop-engineering/SKILL.md` STEP 4 onward (implementation = edits + state-changing Bash) is "execution." On a thinking-tier model it is blocked by the guard; switch to Sonnet or delegate to `fixer` / `tdd-guide`. Under `/autorun`, the tdd phase delegates implementation to a Sonnet agent when the main model is in the thinking tier.
+The TDD/implementation loop mechanics that apply this principle (e.g. the
+implementation phase of a test-driven loop being blocked on a thinking-tier
+model) live in `skills/loop-engineering/` in the claude-engineering foundation,
+not here — this file states only the underlying model-role principle it depends on.
 
 ## Related
 
 - `rules/claude-efficiency.md` — model performance/cost guidance (single source of truth; do not duplicate here)
-- `rules/loop-safety.md` — safety bounds & irreversible-op confirmation
+- `rules/safety-irreversible.md` — safety bounds & irreversible-op confirmation (the
+  engineering-specific elaboration, e.g. `/autorun` gates, lives in the
+  claude-engineering foundation's `loop-safety.md`, not here)
 - [ADR-016](../docs/adr/016-opus-execution-guard.md) — decision & implementation detail
 - [ADR-020](../docs/adr/020-thinking-tier-execution-guard.md) — guard scope extended to the thinking tier (Fable/Mythos)
 - `hooks/opus-execution-guard.py` — implementation
