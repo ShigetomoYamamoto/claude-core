@@ -1,4 +1,4 @@
-# claude-config
+# claude-core
 
 > **本リポジトリは claude-core foundation です（[ADR-023](./docs/adr/023-three-foundation-split.md)）。**
 > 単一のグローバル設定を **core / engineering / work-agent** の3つの独立 foundation に分割した結果、

@@ -1,4 +1,4 @@
-# claude-config アーキテクチャ
+# claude-core アーキテクチャ
 
 > **本リポジトリは claude-core foundation です（[ADR-023](./adr/023-three-foundation-split.md)）。**
 > 単一設定を core / engineering / work-agent の3 foundation に分割した結果、以下は
@@ -9,7 +9,7 @@
 
 ## 概要
 
-claude-config（claude-core）は Claude Code のグローバル設定を管理する dotfiles リポジトリ。「人間の開発業務を Claude Code が肩代わり・サポートする」という上位目的を実現するための土台・基盤を提供する。
+claude-core は Claude Code のグローバル設定を管理する dotfiles リポジトリ。「人間の開発業務を Claude Code が肩代わり・サポートする」という上位目的を実現するための土台・基盤を提供する。
 
 詳細な要件は [`requirements.md`](./requirements.md) を参照。
 

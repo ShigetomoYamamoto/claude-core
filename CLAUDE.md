@@ -1,4 +1,4 @@
-# CLAUDE.md — claude-config リポジトリでの作業ルール
+# CLAUDE.md — claude-core リポジトリでの作業ルール
 
 このリポジトリは `~/.claude` へ copy インストールされる **claude-core（ドメイン中立）の正本**
 （[ADR-023](./docs/adr/023-three-foundation-split.md)）。単一設定を core / engineering /

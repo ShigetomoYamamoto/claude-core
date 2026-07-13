@@ -1,4 +1,4 @@
-# claude-config 要件定義
+# claude-core 要件定義
 
 > **本リポジトリは claude-core foundation です（[ADR-023](./adr/023-three-foundation-split.md)）。**
 > 単一設定を core / engineering / work-agent の3 foundation に分割した結果、この要件定義の
