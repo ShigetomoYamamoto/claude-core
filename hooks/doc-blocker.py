@@ -14,7 +14,7 @@ if os.path.exists(path):
 basename = os.path.basename(path)
 parts = path.split('/')
 
-ALLOWED_NAMES = {'CLAUDE.md', 'ONBOARDING.md', 'CHANGELOG.md', 'MEMORY.md', 'SKILL.md'}
+ALLOWED_NAMES = {'CLAUDE.md', 'ONBOARDING.md', 'CHANGELOG.md', 'MEMORY.md', 'SKILL.md', 'README.md'}
 ALLOWED_DIRS  = {'.claude', 'docs', '.github', 'memory', 'skills', 'commands', 'agents', 'rules', 'tmp'}
 
 if basename in ALLOWED_NAMES:
