@@ -19,10 +19,17 @@ _MUTATING = re.compile(
     rf'|{_B}sed\s+(?:\S+\s+)*-[a-zA-Z]*i[a-zA-Z]*\b'
     rf'|{_B}perl\s+(?:\S+\s+)*-[a-zA-Z]*i[a-zA-Z]*\b'
     rf'|{_B}git\s+(?:add|commit|push|reset|clean|checkout|restore|rm|mv)\b'
-    rf'|{_B}(?:npm\s+(?:install|i|ci)|yarn\s+(?:add|install)|pnpm\s+(?:add|install)|pip3?\s+install)\b'
-    r'|(?<![&\d])>>?(?!&)',   # リダイレクト > / >> (fd 複製除外)
+    rf'|{_B}(?:npm\s+(?:install|i|ci)|yarn\s+(?:add|install)|pnpm\s+(?:add|install)|pip3?\s+install)\b',
     re.MULTILINE,
 )
+
+# リダイレクト検出は _MUTATING から分離する。クォート内を除去してから判定することで
+# grep "a->b" / awk 'NR>=600' のような読み取り専用コマンドの誤検知を防ぐ。
+# 併せて fd 複製(2>&1)は除外し、fd 付きリダイレクト(1> file)は検出する。
+# 注: クォートで囲まれていない `x>1` のような比較はシェルのトークン化なしには
+# リダイレクトと区別できず、依然としてブロック側に倒れる(既知の近似・ADR-006 の fail-open 方針とは別問題)。
+_QUOTED = re.compile(r'"[^"]*"' + r"|'[^']*'")
+_REDIRECT = re.compile(r'(?<![-=<>&])>>?(?![&=>])')
 
 
 def read_latest_model(path):
@@ -57,7 +64,10 @@ def is_thinking_model(model):
 
 
 def is_mutating_bash(cmd):
-    return bool(_MUTATING.search(cmd))
+    if _MUTATING.search(cmd):
+        return True
+    # クォート内は空白に置換する(引用符をまたいだ誤結合を避けるため削除ではなく空白)
+    return bool(_REDIRECT.search(_QUOTED.sub(' ', cmd)))
 
 
 try:
@@ -72,7 +82,9 @@ try:
         sys.exit(0)
     if tool in EDIT_TOOLS or (tool == "Bash" and is_mutating_bash(data.get("tool_input", {}).get("command", ""))):
         print("思考ティア(Opus/Fable)はエスカレーション専用で、ファイル編集・変更系 Bash を直接実行できません。", file=sys.stderr)
-        print("判断が済んだら `/model sonnet` に戻すか、Sonnet サブエージェントに委譲してください。", file=sys.stderr)
+        print("→ Sonnet サブエージェントに委譲してください(Agent ツール, model: sonnet)。", file=sys.stderr)
+        print("  委譲時は run_in_background: false を指定し、完了報告を受け取ってから次へ進むこと(既定は背景実行のためループが止まる)。", file=sys.stderr)
+        print("ユーザーにモデル切り替えを依頼しないこと。委譲はあなたが今すぐ自分で実行できる。", file=sys.stderr)
         print("参照: rules/role-separation.md / ADR-016 / ADR-020 / ADR-024", file=sys.stderr)
         sys.exit(2)
     sys.exit(0)

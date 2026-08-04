@@ -250,5 +250,40 @@ class OpusExecutionGuardTest(unittest.TestCase):
         self.assertEqual(run_hook("Bash", {"command": "git status"}, t), 0)
 
 
+    # --- ケース34: 引用符内の -> は誤検知しない(読み取り専用) ---
+    def test_34_arrow_in_quotes_no_false_positive(self):
+        t = self.make_transcript([opus_assistant("claude-opus-4-8")])
+        self.assertEqual(run_hook("Bash", {"command": 'grep -n "a->b" f.txt'}, t), 0)
+
+    # --- ケース35: 引用符内の >= は誤検知しない(読み取り専用) ---
+    def test_35_gte_in_quotes_no_false_positive(self):
+        t = self.make_transcript([opus_assistant("claude-opus-4-8")])
+        self.assertEqual(run_hook("Bash", {"command": "awk 'NR>=600 && NR<=620' f.txt"}, t), 0)
+
+    # --- ケース36: 裸の => は誤検知しない ---
+    def test_36_fat_arrow_no_false_positive(self):
+        t = self.make_transcript([opus_assistant("claude-opus-4-8")])
+        self.assertEqual(run_hook("Bash", {"command": "echo x=>y"}, t), 0)
+
+    # --- ケース37: fd 付きリダイレクト 1> は検出する(旧実装の見落とし) ---
+    def test_37_fd_redirect_blocked(self):
+        t = self.make_transcript([opus_assistant("claude-opus-4-8")])
+        self.assertEqual(run_hook("Bash", {"command": "echo hi 1> out.txt"}, t), 2)
+
+    # --- ケース38: fd 複製 2>&1 は通過 ---
+    def test_38_fd_dup_allowed(self):
+        t = self.make_transcript([opus_assistant("claude-opus-4-8")])
+        self.assertEqual(run_hook("Bash", {"command": "ls -la 2>&1"}, t), 0)
+
+    # --- ケース39: ブロック時のメッセージが委譲を第一手に案内する ---
+    def test_39_block_message_leads_with_delegation(self):
+        t = self.make_transcript([opus_assistant("claude-opus-4-8")])
+        proc = run_hook_full("Edit", {"file_path": "/tmp/x.py"}, t)
+        self.assertEqual(proc.returncode, 2)
+        self.assertIn("Sonnet サブエージェントに委譲", proc.stderr)
+        self.assertIn("run_in_background: false", proc.stderr)
+        self.assertIn("ユーザーにモデル切り替えを依頼しないこと", proc.stderr)
+
+
 if __name__ == "__main__":
     unittest.main()

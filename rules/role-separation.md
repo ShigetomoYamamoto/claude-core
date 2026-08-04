@@ -56,24 +56,30 @@ thinking-tier session editing directly instead of handing back to Sonnet.
 
 The hook fires **only** on Bash and `Edit|Write|MultiEdit|NotebookEdit`. It does **NOT** fire on MCP-routed tool calls (Playwright, repeated MCP ops) or on deploy/migrate/rollback commands. Those are covered by this norm plus the executing agents' `model: sonnet` declaration — never claim the hook guards them.
 
-## Escalating and returning
+## Delegating and escalating
 
-1. **Escalate** — switch to the thinking tier only for one of the 5 triggers above:
+1. **Delegate first** — execution work that needs no judgment goes to a Sonnet
+   subagent via the `Agent` tool (`model: sonnet`). A subagent declaring
+   `model: sonnet` passes the guard's `agent_id` gate regardless of what the main
+   loop is running, so this works mid-escalation.
+   - **Pass `run_in_background: false`.** Subagents run in the background by
+     default (Claude Code 2.1.198+), so a fire-and-forget delegation ends the turn
+     and the loop stalls even after the subagent finishes. Wait for the report,
+     then continue.
+   - **Never ask the user to switch models.** Delegation is something you can do
+     yourself, right now; `/model sonnet` is a user action and is not a substitute
+     for delegating.
+   - Do NOT delegate to the built-in `general-purpose` / `claude` agent while
+     escalated: it inherits the parent (thinking-tier) model, so it runs expensive
+     and off-role (even though the `agent_id` gate would let it through). Use a
+     dedicated `model: sonnet` subagent instead.
+   - The concrete engineering execution agents (`git-runner`, `executor`, `fixer`,
+     `tdd-guide`, `build-error-resolver`, `e2e-runner`) live in the
+     claude-engineering foundation, not here.
+2. **Escalate** — switch to the thinking tier only for one of the 5 triggers above:
    `/model opus` (or `/model fable` for the stricter Fable bar).
-2. **Return** — once the judgment call is made, switch back with `/model sonnet`
-   (Sonnet is default, so this is usually just resuming the main conversation).
-3. **Or delegate instead of escalating** — for execution work that doesn't need
-   judgment, hand it to a Sonnet subagent via `Task` (or pass `model: sonnet`
-   explicitly in the call). A subagent declaring `model: sonnet` passes the guard's
-   `agent_id` gate regardless of what the main loop is running. The concrete
-   engineering execution agents (`git-runner`, `executor`, `fixer`, `tdd-guide`,
-   `build-error-resolver`, `e2e-runner`) live in the claude-engineering foundation,
-   not here.
-
-   Do NOT delegate execution to the built-in `general-purpose` / `claude` agent while
-   escalated: it inherits the parent (thinking-tier) model, so it runs expensive and
-   off-role (even though the `agent_id` gate would let it through). Use a dedicated
-   `model: sonnet` subagent instead.
+3. **Return** — once the judgment call is made, resume on Sonnet (`/model sonnet`);
+   Sonnet is the default, so this is usually just continuing the main conversation.
 
 ## Tool operations
 
