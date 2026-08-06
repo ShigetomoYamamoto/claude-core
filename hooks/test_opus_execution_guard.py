@@ -5,9 +5,11 @@
       （または python3 hooks/test_opus_execution_guard.py）
 
 hook は PreToolUse で stdin から JSON を受け取り、
-メインループの思考ティアモデル(Opus/Fable/Mythos)が Edit/Write/MultiEdit/NotebookEdit または
-変更系 Bash を実行しようとした場合に exit 2 でブロックする。
-サブエージェント(agent_id あり)・Sonnet/Haiku・監視対象外ツールは通過させる。
+メインループ(agent_id なし)が Edit/Write/MultiEdit/NotebookEdit または
+変更系 Bash を実行しようとした場合に exit 2 でブロックする(ADR-026)。
+判定軸は agent_id の有無のみで、モデルは一切見ない。
+例外は auto-memory(~/.claude/projects/*/memory/)とセッション scratchpad の
+固定パス2箇所のみ。サブエージェント(agent_id あり)・監視対象外ツールは通過させる。
 """
 import json
 import os
@@ -55,7 +57,7 @@ def run_hook_full(tool_name: str, tool_input: dict, transcript_path: str, agent_
 
 
 def opus_assistant(model: str = "claude-opus-4-8") -> dict:
-    """直近 assistant レコードのひな型。"""
+    """直近 assistant レコードのひな型(model はもう読まれないが引数として渡し続けてよい)。"""
     return {"type": "assistant", "message": {"model": model}}
 
 
@@ -80,229 +82,232 @@ class OpusExecutionGuardTest(unittest.TestCase):
         self._paths.append(path)
         return path
 
-    # --- ケース1: Opus + Edit → ブロック ---
-    def test_01_opus_edit_blocked(self):
+    def memory_path(self) -> str:
+        """auto-memory の許可パス例を組む(実行環境依存を避けるため expanduser を使う)。"""
+        return os.path.join(
+            os.path.expanduser("~"), ".claude", "projects", "some-project",
+            "memory", "a.md",
+        )
+
+    # --- ケース1: メイン(agent_id なし) + Edit → ブロック ---
+    def test_01_main_edit_blocked(self):
         t = self.make_transcript([opus_assistant("claude-opus-4-8")])
         self.assertEqual(run_hook("Edit", {"file_path": "/tmp/x.py"}, t), 2)
 
-    # --- ケース2: Opus 1M + Write → ブロック ---
-    def test_02_opus_1m_write_blocked(self):
-        t = self.make_transcript([opus_assistant("claude-opus-4-8[1m]")])
+    # --- ケース2: メイン + Write → ブロック ---
+    def test_02_main_write_blocked(self):
+        t = self.make_transcript([opus_assistant("claude-opus-4-8")])
         self.assertEqual(run_hook("Write", {"file_path": "/tmp/x.py", "content": "x"}, t), 2)
 
-    # --- ケース3: Opus + MultiEdit → ブロック ---
-    def test_03_opus_multiedit_blocked(self):
+    # --- ケース3: メイン + MultiEdit → ブロック ---
+    def test_03_main_multiedit_blocked(self):
         t = self.make_transcript([opus_assistant("claude-opus-4-8")])
         self.assertEqual(run_hook("MultiEdit", {"file_path": "/tmp/x.py"}, t), 2)
 
-    # --- ケース4: Opus + NotebookEdit → ブロック ---
-    def test_04_opus_notebookedit_blocked(self):
+    # --- ケース4: メイン + NotebookEdit → ブロック ---
+    def test_04_main_notebookedit_blocked(self):
         t = self.make_transcript([opus_assistant("claude-opus-4-8")])
         self.assertEqual(run_hook("NotebookEdit", {"notebook_path": "/tmp/x.ipynb"}, t), 2)
 
-    # --- ケース5: Sonnet + Edit → 通過 ---
-    def test_05_sonnet_edit_allowed(self):
+    # --- ケース5: model が sonnet でもメインなら Edit はブロック(モデル非依存) ---
+    def test_05_sonnet_main_edit_blocked(self):
         t = self.make_transcript([opus_assistant("claude-sonnet-4-6")])
-        self.assertEqual(run_hook("Edit", {"file_path": "/tmp/x.py"}, t), 0)
+        self.assertEqual(run_hook("Edit", {"file_path": "/tmp/x.py"}, t), 2)
 
-    # --- ケース6: Haiku + Edit → 通過 ---
-    def test_06_haiku_edit_allowed(self):
+    # --- ケース6: model が haiku でもメインなら Edit はブロック(モデル非依存) ---
+    def test_06_haiku_main_edit_blocked(self):
         t = self.make_transcript([opus_assistant("claude-haiku-4-5-20251001")])
-        self.assertEqual(run_hook("Edit", {"file_path": "/tmp/x.py"}, t), 0)
+        self.assertEqual(run_hook("Edit", {"file_path": "/tmp/x.py"}, t), 2)
 
-    # --- ケース7: Opus + Bash rm -rf → ブロック ---
-    def test_07_opus_bash_rm_blocked(self):
+    # --- ケース7: model が opus でもメインなら Edit はブロック(モデル非依存) ---
+    def test_07_opus_main_edit_blocked(self):
+        t = self.make_transcript([opus_assistant("claude-opus-4-8")])
+        self.assertEqual(run_hook("Edit", {"file_path": "/tmp/x.py"}, t), 2)
+
+    # --- ケース8: model が判定不能(空 transcript)でもメインなら Edit はブロック ---
+    def test_08_no_model_main_edit_still_blocked(self):
+        t = self.make_transcript([])
+        self.assertEqual(run_hook("Edit", {"file_path": "/tmp/x.py"}, t), 2)
+
+    # --- ケース9: transcript_path が存在しなくてもメインなら Edit はブロック ---
+    def test_09_nonexistent_transcript_main_edit_still_blocked(self):
+        self.assertEqual(run_hook("Edit", {"file_path": "/tmp/x.py"}, "/nonexistent/path/transcript.jsonl"), 2)
+
+    # --- ケース10: メイン + Edit、パスが memory 配下 → 通過 ---
+    def test_10_main_edit_memory_path_allowed(self):
+        t = self.make_transcript([opus_assistant("claude-opus-4-8")])
+        self.assertEqual(run_hook("Edit", {"file_path": self.memory_path()}, t), 0)
+
+    # --- ケース11: メイン + Write、パスが /private/tmp scratchpad 配下 → 通過 ---
+    def test_11_main_write_private_tmp_scratchpad_allowed(self):
+        t = self.make_transcript([opus_assistant("claude-opus-4-8")])
+        p = "/private/tmp/claude-501/-some-project/abcd1234/scratchpad/x.txt"
+        self.assertEqual(run_hook("Write", {"file_path": p, "content": "x"}, t), 0)
+
+    # --- ケース12: メイン + Write、パスが /tmp scratchpad 配下 → 通過 ---
+    def test_12_main_write_tmp_scratchpad_allowed(self):
+        t = self.make_transcript([opus_assistant("claude-opus-4-8")])
+        p = "/tmp/claude-501/-some-project/abcd1234/scratchpad/x.txt"
+        self.assertEqual(run_hook("Write", {"file_path": p, "content": "x"}, t), 0)
+
+    # --- ケース13: メイン + Edit、file_path が空 → fail-open で通過 ---
+    def test_13_main_edit_empty_path_fail_open(self):
+        t = self.make_transcript([opus_assistant("claude-opus-4-8")])
+        self.assertEqual(run_hook("Edit", {"file_path": ""}, t), 0)
+
+    # --- ケース14: メイン + Edit、file_path も notebook_path も欠落 → fail-open で通過 ---
+    def test_14_main_edit_missing_path_fail_open(self):
+        t = self.make_transcript([opus_assistant("claude-opus-4-8")])
+        self.assertEqual(run_hook("Edit", {}, t), 0)
+
+    # --- ケース15: サブエージェント(agent_id あり) + Edit、任意のパス → 通過 ---
+    def test_15_subagent_edit_allowed(self):
+        t = self.make_transcript([opus_assistant("claude-opus-4-8")])
+        self.assertEqual(run_hook("Edit", {"file_path": "/tmp/x.py"}, t, agent_id="agent-abc123"), 0)
+
+    # --- ケース16: サブエージェント + Bash rm -rf → 通過 ---
+    def test_16_subagent_bash_rm_allowed(self):
+        t = self.make_transcript([opus_assistant("claude-opus-4-8")])
+        self.assertEqual(run_hook("Bash", {"command": "rm -rf x"}, t, agent_id="agent-abc123"), 0)
+
+    # --- ケース17: メイン + Bash rm -rf → ブロック ---
+    def test_17_main_bash_rm_blocked(self):
         t = self.make_transcript([opus_assistant("claude-opus-4-8")])
         self.assertEqual(run_hook("Bash", {"command": "rm -rf build"}, t), 2)
 
-    # --- ケース8: Opus + Bash git commit → ブロック ---
-    def test_08_opus_bash_git_commit_blocked(self):
+    # --- ケース18: メイン + Bash git commit → ブロック ---
+    def test_18_main_bash_git_commit_blocked(self):
         t = self.make_transcript([opus_assistant("claude-opus-4-8")])
         self.assertEqual(run_hook("Bash", {"command": "git commit -m x"}, t), 2)
 
-    # --- ケース9: Opus + Bash sed -i → ブロック ---
-    def test_09_opus_bash_sed_inplace_blocked(self):
+    # --- ケース19: メイン + Bash sed -i → ブロック ---
+    def test_19_main_bash_sed_inplace_blocked(self):
         t = self.make_transcript([opus_assistant("claude-opus-4-8")])
         self.assertEqual(run_hook("Bash", {"command": "sed -i 's/a/b/' f"}, t), 2)
 
-    # --- ケース10: Opus + Bash mkdir → ブロック ---
-    def test_10_opus_bash_mkdir_blocked(self):
+    # --- ケース20: メイン + Bash mkdir → ブロック ---
+    def test_20_main_bash_mkdir_blocked(self):
         t = self.make_transcript([opus_assistant("claude-opus-4-8")])
         self.assertEqual(run_hook("Bash", {"command": "mkdir foo"}, t), 2)
 
-    # --- ケース11: Opus + Bash npm install → ブロック ---
-    def test_11_opus_bash_npm_install_blocked(self):
+    # --- ケース21: メイン + Bash npm install → ブロック ---
+    def test_21_main_bash_npm_install_blocked(self):
         t = self.make_transcript([opus_assistant("claude-opus-4-8")])
         self.assertEqual(run_hook("Bash", {"command": "npm install"}, t), 2)
 
-    # --- ケース12: Opus + Bash リダイレクト > → ブロック ---
-    def test_12_opus_bash_redirect_blocked(self):
+    # --- ケース22: メイン + Bash リダイレクト > → ブロック ---
+    def test_22_main_bash_redirect_blocked(self):
         t = self.make_transcript([opus_assistant("claude-opus-4-8")])
         self.assertEqual(run_hook("Bash", {"command": "echo x > out.txt"}, t), 2)
 
-    # --- ケース13: Opus + Bash git status → 通過 ---
-    def test_13_opus_bash_git_status_allowed(self):
+    # --- ケース23: メイン + Bash リダイレクト 1> → ブロック ---
+    def test_23_main_bash_fd_redirect_blocked(self):
+        t = self.make_transcript([opus_assistant("claude-opus-4-8")])
+        self.assertEqual(run_hook("Bash", {"command": "echo hi 1> out.txt"}, t), 2)
+
+    # --- ケース24: メイン + Bash git status → 通過 ---
+    def test_24_main_bash_git_status_allowed(self):
         t = self.make_transcript([opus_assistant("claude-opus-4-8")])
         self.assertEqual(run_hook("Bash", {"command": "git status"}, t), 0)
 
-    # --- ケース14: Opus + Bash ls → 通過 ---
-    def test_14_opus_bash_ls_allowed(self):
+    # --- ケース25: メイン + Bash ls -la → 通過 ---
+    def test_25_main_bash_ls_allowed(self):
         t = self.make_transcript([opus_assistant("claude-opus-4-8")])
         self.assertEqual(run_hook("Bash", {"command": "ls -la"}, t), 0)
 
-    # --- ケース15: Opus + Bash npm test → 通過 ---
-    def test_15_opus_bash_npm_test_allowed(self):
+    # --- ケース26: メイン + Bash npm test → 通過 ---
+    def test_26_main_bash_npm_test_allowed(self):
         t = self.make_transcript([opus_assistant("claude-opus-4-8")])
         self.assertEqual(run_hook("Bash", {"command": "npm test"}, t), 0)
 
-    # --- ケース16: Opus + Bash pytest → 通過 ---
-    def test_16_opus_bash_pytest_allowed(self):
+    # --- ケース27: メイン + Bash pytest -q → 通過 ---
+    def test_27_main_bash_pytest_allowed(self):
         t = self.make_transcript([opus_assistant("claude-opus-4-8")])
         self.assertEqual(run_hook("Bash", {"command": "pytest -q"}, t), 0)
 
-    # --- ケース17: Opus + Bash git log --grep 引数内の rm は誤爆しない ---
-    def test_17_opus_bash_rm_in_arg_no_false_positive(self):
+    # --- ケース28: メイン + Bash git log --grep 引数内の rm は誤爆しない ---
+    def test_28_main_bash_rm_in_arg_no_false_positive(self):
         t = self.make_transcript([opus_assistant("claude-opus-4-8")])
         self.assertEqual(run_hook("Bash", {"command": 'git log --grep "rm -rf"'}, t), 0)
 
-    # --- ケース18: Opus + Bash echo 文字列内の rm は誤爆しない ---
-    def test_18_opus_bash_rm_in_string_no_false_positive(self):
+    # --- ケース29: メイン + Bash echo 文字列内の rm は誤爆しない ---
+    def test_29_main_bash_rm_in_string_no_false_positive(self):
         t = self.make_transcript([opus_assistant("claude-opus-4-8")])
         self.assertEqual(run_hook("Bash", {"command": 'echo "rm me"'}, t), 0)
 
-    # --- ケース19: assistant 行に model フィールドなし → fail-open ---
-    def test_19_no_model_field_fail_open(self):
-        t = self.make_transcript([{"type": "assistant", "message": {}}])
-        self.assertEqual(run_hook("Edit", {"file_path": "/tmp/x.py"}, t), 0)
+    # --- ケース30: メイン + Bash 引用符内の -> は誤検知しない(読み取り専用) ---
+    def test_30_main_bash_arrow_in_quotes_no_false_positive(self):
+        t = self.make_transcript([opus_assistant("claude-opus-4-8")])
+        self.assertEqual(run_hook("Bash", {"command": 'grep -n "a->b" f.txt'}, t), 0)
 
-    # --- ケース20: 空 transcript → fail-open ---
-    def test_20_empty_transcript_fail_open(self):
-        t = self.make_transcript([])
-        self.assertEqual(run_hook("Edit", {"file_path": "/tmp/x.py"}, t), 0)
+    # --- ケース31: メイン + Bash 引用符内の >= は誤検知しない(読み取り専用) ---
+    def test_31_main_bash_gte_in_quotes_no_false_positive(self):
+        t = self.make_transcript([opus_assistant("claude-opus-4-8")])
+        self.assertEqual(run_hook("Bash", {"command": "awk 'NR>=600 && NR<=620' f.txt"}, t), 0)
 
-    # --- ケース21: transcript_path が存在しないパス → fail-open ---
-    def test_21_nonexistent_transcript_fail_open(self):
-        self.assertEqual(run_hook("Edit", {"file_path": "/tmp/x.py"}, "/nonexistent/path/transcript.jsonl"), 0)
+    # --- ケース32: メイン + Bash 裸の => は誤検知しない ---
+    def test_32_main_bash_fat_arrow_no_false_positive(self):
+        t = self.make_transcript([opus_assistant("claude-opus-4-8")])
+        self.assertEqual(run_hook("Bash", {"command": "echo x=>y"}, t), 0)
 
-    # --- ケース22: 壊れた行を含む JSONL, 末尾に opus-assistant → ブロック ---
-    def test_22_broken_lines_skipped_latest_opus_blocked(self):
-        broken_line = '{"broken": true'   # 不完全 JSON
-        t = self.make_transcript([broken_line, opus_assistant("claude-opus-4-8")])
-        self.assertEqual(run_hook("Edit", {"file_path": "/tmp/x.py"}, t), 2)
+    # --- ケース33: メイン + Bash fd 複製 2>&1 は通過 ---
+    def test_33_main_bash_fd_dup_allowed(self):
+        t = self.make_transcript([opus_assistant("claude-opus-4-8")])
+        self.assertEqual(run_hook("Bash", {"command": "ls -la 2>&1"}, t), 0)
 
-    # --- ケース23: user 行を挟む; 逆順で assistant を正しく拾う ---
-    def test_23_intervening_user_rows_picks_latest_assistant(self):
+    # --- ケース34: メイン + Bash 2>/dev/null は通過(頻出する読み取り専用の書き方) ---
+    def test_34_main_bash_stderr_to_devnull_allowed(self):
+        t = self.make_transcript([opus_assistant("claude-opus-4-8")])
+        self.assertEqual(run_hook("Bash", {"command": "find . -name x 2>/dev/null"}, t), 0)
+
+    # --- ケース35: メイン + Bash > /dev/null は通過 ---
+    def test_35_main_bash_stdout_to_devnull_allowed(self):
+        t = self.make_transcript([opus_assistant("claude-opus-4-8")])
+        self.assertEqual(run_hook("Bash", {"command": "make build > /dev/null"}, t), 0)
+
+    # --- ケース36: メイン + Bash >> /dev/null は通過 ---
+    def test_36_main_bash_append_to_devnull_allowed(self):
+        t = self.make_transcript([opus_assistant("claude-opus-4-8")])
+        self.assertEqual(run_hook("Bash", {"command": "make build >> /dev/null"}, t), 0)
+
+    # --- ケース37: メイン + Bash /dev/null に似た別ファイルはブロック ---
+    def test_37_main_bash_devnull_lookalike_blocked(self):
+        t = self.make_transcript([opus_assistant("claude-opus-4-8")])
+        self.assertEqual(run_hook("Bash", {"command": "echo x > /dev/nullish"}, t), 2)
+
+    # --- ケース38: 監視対象外ツール(Read) → 即通過 ---
+    def test_38_non_monitored_tool_passthrough(self):
+        t = self.make_transcript([opus_assistant("claude-opus-4-8")])
+        self.assertEqual(run_hook("Read", {"file_path": "/tmp/x.py"}, t), 0)
+
+    # --- ケース39: ブロック時 stderr に案内メッセージが出る(stdout は空) ---
+    def test_39_block_outputs_to_stderr_not_stdout(self):
+        t = self.make_transcript([opus_assistant("claude-opus-4-8")])
+        proc = run_hook_full("Edit", {"file_path": "/tmp/x.py"}, t)
+        self.assertEqual(proc.returncode, 2)
+        self.assertIn("メインループは実作業を担当しません", proc.stderr)
+        self.assertEqual(proc.stdout, "")
+
+    # --- ケース40: ブロック時のメッセージが委譲を案内し、思考ティア言及は含まない ---
+    def test_40_block_message_content(self):
+        t = self.make_transcript([opus_assistant("claude-opus-4-8")])
+        proc = run_hook_full("Edit", {"file_path": "/tmp/x.py"}, t)
+        self.assertEqual(proc.returncode, 2)
+        self.assertIn("run_in_background: false", proc.stderr)
+        self.assertIn("ユーザーにモデル切り替えを依頼しないこと", proc.stderr)
+        self.assertNotIn("思考ティア", proc.stderr)
+
+    # --- ケース41: transcript にユーザ行が混ざっていてもメインの Edit は判定に影響しない ---
+    def test_41_intervening_user_rows_do_not_affect_decision(self):
         records = [user_msg(), opus_assistant("claude-opus-4-8"), user_msg()]
         t = self.make_transcript(records)
         self.assertEqual(run_hook("Edit", {"file_path": "/tmp/x.py"}, t), 2)
 
-    # --- ケース24: claude-sonnet-opusish-9 (前方一致厳密性) → 通過 ---
-    def test_24_fake_opus_name_allowed(self):
-        t = self.make_transcript([opus_assistant("claude-sonnet-opusish-9")])
-        self.assertEqual(run_hook("Edit", {"file_path": "/tmp/x.py"}, t), 0)
-
-    # --- ケース25: Opus + Edit + agent_id あり → 通過 (サブエージェント) ---
-    def test_25_subagent_edit_allowed(self):
-        t = self.make_transcript([opus_assistant("claude-opus-4-8")])
-        self.assertEqual(run_hook("Edit", {"file_path": "/tmp/x.py"}, t, agent_id="agent-abc123"), 0)
-
-    # --- ケース26: Opus + Bash rm + agent_id あり → 通過 (サブエージェント) ---
-    def test_26_subagent_bash_rm_allowed(self):
-        t = self.make_transcript([opus_assistant("claude-opus-4-8")])
-        self.assertEqual(run_hook("Bash", {"command": "rm -rf x"}, t, agent_id="agent-abc123"), 0)
-
-    # --- ケース27: 監視対象外ツール(Read) → 即通過 ---
-    def test_27_non_monitored_tool_passthrough(self):
-        t = self.make_transcript([opus_assistant("claude-opus-4-8")])
-        self.assertEqual(run_hook("Read", {"file_path": "/tmp/x.py"}, t), 0)
-
-    # --- ケース28: ブロック時 stderr に案内メッセージが出る(stdout は空) ---
-    def test_28_block_outputs_to_stderr_not_stdout(self):
-        t = self.make_transcript([opus_assistant("claude-opus-4-8")])
-        proc = run_hook_full("Edit", {"file_path": "/tmp/x.py"}, t)
-        self.assertEqual(proc.returncode, 2)
-        self.assertIn("思考ティア(Opus/Fable)はエスカレーション専用で、ファイル編集・変更系 Bash を直接実行できません。", proc.stderr)
-        self.assertEqual(proc.stdout, "")
-
-    # --- ケース29: Fable + Edit → ブロック (ADR-020: 思考ティア拡張) ---
-    def test_29_fable_edit_blocked(self):
-        t = self.make_transcript([opus_assistant("claude-fable-5")])
+    # --- ケース42: 壊れた行を含む transcript でもメインの Edit はブロックされる(判定は agent_id のみ) ---
+    def test_42_broken_transcript_lines_do_not_affect_decision(self):
+        broken_line = '{"broken": true'   # 不完全 JSON
+        t = self.make_transcript([broken_line, opus_assistant("claude-opus-4-8")])
         self.assertEqual(run_hook("Edit", {"file_path": "/tmp/x.py"}, t), 2)
-
-    # --- ケース30: Fable + Bash git commit → ブロック (ADR-020) ---
-    def test_30_fable_bash_git_commit_blocked(self):
-        t = self.make_transcript([opus_assistant("claude-fable-5")])
-        self.assertEqual(run_hook("Bash", {"command": "git commit -m x"}, t), 2)
-
-    # --- ケース31: Mythos + Edit → ブロック (ADR-020) ---
-    def test_31_mythos_edit_blocked(self):
-        t = self.make_transcript([opus_assistant("claude-mythos-5")])
-        self.assertEqual(run_hook("Edit", {"file_path": "/tmp/x.py"}, t), 2)
-
-    # --- ケース32: Fable + Edit + agent_id あり → 通過 (サブエージェント委譲) ---
-    def test_32_fable_subagent_edit_allowed(self):
-        t = self.make_transcript([opus_assistant("claude-fable-5")])
-        self.assertEqual(run_hook("Edit", {"file_path": "/tmp/x.py"}, t, agent_id="agent-abc123"), 0)
-
-    # --- ケース33: Fable + Bash git status → 通過 (読み取り系) ---
-    def test_33_fable_bash_read_allowed(self):
-        t = self.make_transcript([opus_assistant("claude-fable-5")])
-        self.assertEqual(run_hook("Bash", {"command": "git status"}, t), 0)
-
-
-    # --- ケース34: 引用符内の -> は誤検知しない(読み取り専用) ---
-    def test_34_arrow_in_quotes_no_false_positive(self):
-        t = self.make_transcript([opus_assistant("claude-opus-4-8")])
-        self.assertEqual(run_hook("Bash", {"command": 'grep -n "a->b" f.txt'}, t), 0)
-
-    # --- ケース35: 引用符内の >= は誤検知しない(読み取り専用) ---
-    def test_35_gte_in_quotes_no_false_positive(self):
-        t = self.make_transcript([opus_assistant("claude-opus-4-8")])
-        self.assertEqual(run_hook("Bash", {"command": "awk 'NR>=600 && NR<=620' f.txt"}, t), 0)
-
-    # --- ケース36: 裸の => は誤検知しない ---
-    def test_36_fat_arrow_no_false_positive(self):
-        t = self.make_transcript([opus_assistant("claude-opus-4-8")])
-        self.assertEqual(run_hook("Bash", {"command": "echo x=>y"}, t), 0)
-
-    # --- ケース37: fd 付きリダイレクト 1> は検出する(旧実装の見落とし) ---
-    def test_37_fd_redirect_blocked(self):
-        t = self.make_transcript([opus_assistant("claude-opus-4-8")])
-        self.assertEqual(run_hook("Bash", {"command": "echo hi 1> out.txt"}, t), 2)
-
-    # --- ケース38: fd 複製 2>&1 は通過 ---
-    def test_38_fd_dup_allowed(self):
-        t = self.make_transcript([opus_assistant("claude-opus-4-8")])
-        self.assertEqual(run_hook("Bash", {"command": "ls -la 2>&1"}, t), 0)
-
-    # --- ケース39: ブロック時のメッセージが委譲を第一手に案内する ---
-    def test_39_block_message_leads_with_delegation(self):
-        t = self.make_transcript([opus_assistant("claude-opus-4-8")])
-        proc = run_hook_full("Edit", {"file_path": "/tmp/x.py"}, t)
-        self.assertEqual(proc.returncode, 2)
-        self.assertIn("Sonnet サブエージェントに委譲", proc.stderr)
-        self.assertIn("run_in_background: false", proc.stderr)
-        self.assertIn("ユーザーにモデル切り替えを依頼しないこと", proc.stderr)
-
-    # --- ケース40: 2>/dev/null は通過(頻出する読み取り専用の書き方) ---
-    def test_40_stderr_to_devnull_allowed(self):
-        t = self.make_transcript([opus_assistant("claude-opus-4-8")])
-        self.assertEqual(run_hook("Bash", {"command": "find . -name x 2>/dev/null"}, t), 0)
-
-    # --- ケース41: > /dev/null は通過 ---
-    def test_41_stdout_to_devnull_allowed(self):
-        t = self.make_transcript([opus_assistant("claude-opus-4-8")])
-        self.assertEqual(run_hook("Bash", {"command": "make build > /dev/null"}, t), 0)
-
-    # --- ケース42: >> /dev/null は通過 ---
-    def test_42_append_to_devnull_allowed(self):
-        t = self.make_transcript([opus_assistant("claude-opus-4-8")])
-        self.assertEqual(run_hook("Bash", {"command": "make build >> /dev/null"}, t), 0)
-
-    # --- ケース43: /dev/null に似た別ファイルはブロック ---
-    def test_43_devnull_lookalike_blocked(self):
-        t = self.make_transcript([opus_assistant("claude-opus-4-8")])
-        self.assertEqual(run_hook("Bash", {"command": "echo x > /dev/nullish"}, t), 2)
 
 
 if __name__ == "__main__":
