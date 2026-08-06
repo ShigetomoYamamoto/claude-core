@@ -284,6 +284,26 @@ class OpusExecutionGuardTest(unittest.TestCase):
         self.assertIn("run_in_background: false", proc.stderr)
         self.assertIn("ユーザーにモデル切り替えを依頼しないこと", proc.stderr)
 
+    # --- ケース40: 2>/dev/null は通過(頻出する読み取り専用の書き方) ---
+    def test_40_stderr_to_devnull_allowed(self):
+        t = self.make_transcript([opus_assistant("claude-opus-4-8")])
+        self.assertEqual(run_hook("Bash", {"command": "find . -name x 2>/dev/null"}, t), 0)
+
+    # --- ケース41: > /dev/null は通過 ---
+    def test_41_stdout_to_devnull_allowed(self):
+        t = self.make_transcript([opus_assistant("claude-opus-4-8")])
+        self.assertEqual(run_hook("Bash", {"command": "make build > /dev/null"}, t), 0)
+
+    # --- ケース42: >> /dev/null は通過 ---
+    def test_42_append_to_devnull_allowed(self):
+        t = self.make_transcript([opus_assistant("claude-opus-4-8")])
+        self.assertEqual(run_hook("Bash", {"command": "make build >> /dev/null"}, t), 0)
+
+    # --- ケース43: /dev/null に似た別ファイルはブロック ---
+    def test_43_devnull_lookalike_blocked(self):
+        t = self.make_transcript([opus_assistant("claude-opus-4-8")])
+        self.assertEqual(run_hook("Bash", {"command": "echo x > /dev/nullish"}, t), 2)
+
 
 if __name__ == "__main__":
     unittest.main()

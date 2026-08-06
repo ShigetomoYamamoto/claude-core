@@ -28,8 +28,9 @@ _MUTATING = re.compile(
 # 併せて fd 複製(2>&1)は除外し、fd 付きリダイレクト(1> file)は検出する。
 # 注: クォートで囲まれていない `x>1` のような比較はシェルのトークン化なしには
 # リダイレクトと区別できず、依然としてブロック側に倒れる(既知の近似・ADR-006 の fail-open 方針とは別問題)。
+# /dev/null への書き捨ては副作用がないため除外する(2>/dev/null / cmd > /dev/null が頻出するため)。
 _QUOTED = re.compile(r'"[^"]*"' + r"|'[^']*'")
-_REDIRECT = re.compile(r'(?<![-=<>&])>>?(?![&=>])')
+_REDIRECT = re.compile(r'(?<![-=<>&])>>?(?![&=>])(?!\s*/dev/null\b)')
 
 
 def read_latest_model(path):
