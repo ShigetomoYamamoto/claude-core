@@ -26,7 +26,7 @@ _MUTATING = re.compile(
     re.MULTILINE,
 )
 
-# リダイレクト検出は _MUTATING から分離する。クォート内を除去してから判定することで
+# クォート除去(_QUOTED)は _MUTATING / _REDIRECT の両方の前段で使う。除去してから判定することで
 # grep "a->b" / awk 'NR>=600' のような読み取り専用コマンドの誤検知を防ぐ。
 # 併せて fd 複製(2>&1)は除外し、fd 付きリダイレクト(1> file)は検出する。
 # 注: クォートで囲まれていない `x>1` のような比較はシェルのトークン化なしには
@@ -37,10 +37,15 @@ _REDIRECT = re.compile(r'(?<![-=<>&])>>?(?![&=>])(?!\s*/dev/null\b)')
 
 
 def is_mutating_bash(cmd):
-    if _MUTATING.search(cmd):
-        return True
-    # クォート内は空白に置換する(引用符をまたいだ誤結合を避けるため削除ではなく空白)
-    return bool(_REDIRECT.search(_QUOTED.sub(' ', cmd)))
+    # クォート内は先に空白へ置換し、その結果に両方の判定をかける。
+    # 引用符の中の | や ; はシェルの区切りではなくただの文字だが、正規表現には
+    # 区別がつかない(grep "cp\|mv" のような読み取り専用コマンドが誤検知される)。
+    # 空白に置換するのは、引用符をまたいだ誤結合を避けるため(削除ではなく空白)。
+    # 代償: 引用符内のサブシェル(sh -c "...; rm -rf x")に隠れた破壊操作は検出できなくなる。
+    # ヒアドキュメントや python3 -c 経由の書き込みが元々素通りである以上、
+    # 検出網を広げるより誤検知を減らす方を優先する(ADR-006 の fail-open と同じ判断)。
+    stripped = _QUOTED.sub(' ', cmd)
+    return bool(_MUTATING.search(stripped)) or bool(_REDIRECT.search(stripped))
 
 
 # メインループに許す例外パス。絶対パスが固定で誤分類の余地がないものだけに限る。

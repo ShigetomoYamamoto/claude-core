@@ -309,6 +309,41 @@ class OpusExecutionGuardTest(unittest.TestCase):
         t = self.make_transcript([broken_line, opus_assistant("claude-opus-4-8")])
         self.assertEqual(run_hook("Edit", {"file_path": "/tmp/x.py"}, t), 2)
 
+    # --- ケース43: メイン + Bash 引用符内の | 交替パターンに削除語が含まれるだけ → 通過(読み取り専用) ---
+    def test_43_main_bash_quoted_pipe_with_denylisted_word_allowed(self):
+        t = self.make_transcript([opus_assistant("claude-opus-4-8")])
+        cmd = 'grep -n "REMOVE\\|stale\\|unlink" installer.py'
+        self.assertEqual(run_hook("Bash", {"command": cmd}, t), 0)
+
+    # --- ケース44: メイン + Bash 引用符内の | に cp/mv が含まれるだけ → 通過(読み取り専用) ---
+    def test_44_main_bash_quoted_pipe_with_copy_move_words_allowed(self):
+        t = self.make_transcript([opus_assistant("claude-opus-4-8")])
+        cmd = 'grep "cp\\|mv" f'
+        self.assertEqual(run_hook("Bash", {"command": cmd}, t), 0)
+
+    # --- ケース45: メイン + Bash 引用符内の ; に mkdir が続くだけ → 通過(読み取り専用) ---
+    def test_45_main_bash_quoted_semicolon_with_mkdir_allowed(self):
+        t = self.make_transcript([opus_assistant("claude-opus-4-8")])
+        cmd = 'echo "foo;mkdir bar"'
+        self.assertEqual(run_hook("Bash", {"command": cmd}, t), 0)
+
+    # --- ケース46: 既知の検出漏れ — 引用符内サブシェル(sh -c "...; rm -rf x")の破壊操作は検出できない ---
+    # これは is_mutating_bash のコメントに明記した意図的な代償であり、バグではない。
+    # クォート内を空白に置換してから判定するため、引用符の中に隠れた ; rm -rf は見えなくなる。
+    # 検出漏れを許容する代わりに grep "cp\|mv" 等の誤検知を減らす選択をしたため(ADR-006 の
+    # fail-open と同じ判断)。将来 sh -c 経由のコマンドインジェクションに対応する場合は
+    # このテストの期待値を更新すること。
+    def test_46_known_gap_quoted_subshell_mutation_not_detected(self):
+        t = self.make_transcript([opus_assistant("claude-opus-4-8")])
+        cmd = 'sh -c "foo; rm -rf /tmp/x"'
+        self.assertEqual(run_hook("Bash", {"command": cmd}, t), 0)
+
+    # --- ケース47: 引用符の外にある本物の破壊操作は引き続きブロックされる ---
+    def test_47_unquoted_mutation_still_blocked(self):
+        t = self.make_transcript([opus_assistant("claude-opus-4-8")])
+        cmd = 'ls; rm -rf build'
+        self.assertEqual(run_hook("Bash", {"command": cmd}, t), 2)
+
 
 if __name__ == "__main__":
     unittest.main()
