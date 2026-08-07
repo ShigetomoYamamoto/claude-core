@@ -30,50 +30,63 @@ source of truth — this file defines only the role split).
 ## Enforcement: the opus-execution-guard hook
 
 `hooks/opus-execution-guard.py` ([ADR-016](../docs/adr/016-opus-execution-guard.md),
-scope extended by [ADR-020](../docs/adr/020-thinking-tier-execution-guard.md), framing
-updated by [ADR-024](../docs/adr/024-sonnet-default-main-loop.md)) enforces the
-hand-back above: it blocks the **active thinking-tier model** from executing
-state-changing operations, whenever it is active — mid-escalation or otherwise:
+extended by [ADR-020](../docs/adr/020-thinking-tier-execution-guard.md), reframed by
+[ADR-024](../docs/adr/024-sonnet-default-main-loop.md), **axis replaced by
+[ADR-026](../docs/adr/026-execution-guard-role-axis.md)**) enforces the split
+mechanically. It keys on **role, not model**: the only thing it reads from stdin is
+whether `agent_id` is present.
 
-- **Edit tools**: `Edit` / `Write` / `MultiEdit` / `NotebookEdit`
-- **State-changing Bash** (denylist): `rm` / `mv` / `cp` / `tee` / `mkdir` / `sed -i` / `git add|commit|push|reset|clean` / `npm|pip install` / redirection `>` `>>`, etc.
+- **Main loop** (no `agent_id`) — cannot run `Edit` / `Write` / `MultiEdit` /
+  `NotebookEdit`, nor state-changing Bash (`rm` / `mv` / `cp` / `tee` / `mkdir` /
+  `sed -i` / `git add|commit|push|reset|clean` / `npm|pip install` / redirection).
+  **This holds on every model, including Sonnet** — that is the point of ADR-026.
+- **Execution layer** (stdin carries `agent_id`) — unrestricted. This is where the
+  work happens.
+- **Two path exceptions for the main loop**: auto-memory
+  (`~/.claude/projects/*/memory/`) and the session scratchpad. Nothing else. The
+  boundary is fixed absolute paths, never a judgment about whether a file is
+  "config" or "product code" — in a config repo like claude-core those are the same
+  files (ADR-026).
+- **Always allowed**: read-only Bash (`ls`, `cat`, `git status|diff|log`), test /
+  lint / typecheck runs, redirection to `/dev/null`, and `Agent` delegation. The
+  main loop keeps its eyes so it can verify what the execution layer reports
+  (maker ≠ checker, `rules/safety-irreversible.md`).
+- **Fail-open** when the decision cannot be made (no path in `tool_input`, malformed
+  stdin) — [ADR-006](../docs/adr/006-hook-error-policy.md).
 
-It reads the active model from the transcript's latest assistant `message.model`; if
-it is a thinking-tier model (`claude-opus-*` / `claude-fable-*` / `claude-mythos-*`),
-the operation is blocked with `exit 2`. **Allowed even on the thinking tier**:
-read-only Bash (`ls`, `cat`, `git status|diff|log`), test/lint/typecheck runs, and
-`Task` delegation.
-
-**Always allowed (pass with exit 0):** subagents (stdin carries `agent_id` → treated
-as the delegated execution layer), Sonnet/Haiku, and any case where the model cannot
-be determined (fail-open, per [ADR-006](../docs/adr/006-hook-error-policy.md)).
-
-The guard's mechanism did not change when the default flipped to Sonnet — only which
-model is normally active did. It still exists to catch the same mistake: a
-thinking-tier session editing directly instead of handing back to Sonnet.
+Before ADR-026 the guard read the transcript's latest assistant `message.model` and
+fired only on the thinking tier. After ADR-024 made Sonnet the default main loop that
+meant it never fired in normal operation, so the role split existed as a norm but not
+as a mechanism. The model check and the transcript read are gone.
 
 ## Physical-layer scope (do not overstate — aligned with [ADR-014](../docs/adr/014-loop-engineering-as-discipline.md))
 
 The hook fires **only** on Bash and `Edit|Write|MultiEdit|NotebookEdit`. It does **NOT** fire on MCP-routed tool calls (Playwright, repeated MCP ops) or on deploy/migrate/rollback commands. Those are covered by this norm plus the executing agents' `model: sonnet` declaration — never claim the hook guards them.
 
-## Escalating and returning
+## Delegating and escalating
 
-1. **Escalate** — switch to the thinking tier only for one of the 5 triggers above:
+1. **Delegate first** — execution work that needs no judgment goes to a Sonnet
+   subagent via the `Agent` tool (`model: sonnet`). A subagent declaring
+   `model: sonnet` passes the guard's `agent_id` gate regardless of what the main
+   loop is running, so this works mid-escalation.
+   - **Pass `run_in_background: false`.** Subagents run in the background by
+     default (Claude Code 2.1.198+), so a fire-and-forget delegation ends the turn
+     and the loop stalls even after the subagent finishes. Wait for the report,
+     then continue.
+   - **Never ask the user to switch models.** Delegation is something you can do
+     yourself, right now; `/model sonnet` is a user action and is not a substitute
+     for delegating.
+   - Do NOT delegate to the built-in `general-purpose` / `claude` agent while
+     escalated: it inherits the parent (thinking-tier) model, so it runs expensive
+     and off-role (even though the `agent_id` gate would let it through). Use a
+     dedicated `model: sonnet` subagent instead.
+   - The concrete engineering execution agents (`git-runner`, `executor`, `fixer`,
+     `tdd-guide`, `build-error-resolver`, `e2e-runner`) live in the
+     claude-engineering foundation, not here.
+2. **Escalate** — switch to the thinking tier only for one of the 5 triggers above:
    `/model opus` (or `/model fable` for the stricter Fable bar).
-2. **Return** — once the judgment call is made, switch back with `/model sonnet`
-   (Sonnet is default, so this is usually just resuming the main conversation).
-3. **Or delegate instead of escalating** — for execution work that doesn't need
-   judgment, hand it to a Sonnet subagent via `Task` (or pass `model: sonnet`
-   explicitly in the call). A subagent declaring `model: sonnet` passes the guard's
-   `agent_id` gate regardless of what the main loop is running. The concrete
-   engineering execution agents (`git-runner`, `executor`, `fixer`, `tdd-guide`,
-   `build-error-resolver`, `e2e-runner`) live in the claude-engineering foundation,
-   not here.
-
-   Do NOT delegate execution to the built-in `general-purpose` / `claude` agent while
-   escalated: it inherits the parent (thinking-tier) model, so it runs expensive and
-   off-role (even though the `agent_id` gate would let it through). Use a dedicated
-   `model: sonnet` subagent instead.
+3. **Return** — once the judgment call is made, resume on Sonnet (`/model sonnet`);
+   Sonnet is the default, so this is usually just continuing the main conversation.
 
 ## Tool operations
 
