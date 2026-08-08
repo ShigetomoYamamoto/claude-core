@@ -75,7 +75,7 @@ claude-engineering foundation 側のアーキテクチャに移動しました�
 
 | hook | タイミング | 責務 |
 |---|---|---|
-| `opus-execution-guard.py` | PreToolUse(Edit/Write/MultiEdit/NotebookEdit, Bash) | 思考ティア（Opus/Fable/Mythos）の編集・変更系 Bash 実行をブロック |
+| `main-loop-execution-guard.py` | PreToolUse(Edit/Write/MultiEdit/NotebookEdit, Bash) | 思考ティア（Opus/Fable/Mythos）の編集・変更系 Bash 実行をブロック |
 | `doc-blocker.py` | PreToolUse(Write) | 許可リスト外の新規 `.md` / `.txt` 生成を阻止（既存ファイルの編集は許可） |
 | `mass-delete-blocker.py` | PreToolUse(Bash) | 再帰削除・大量削除を検知し実行前に確認（ルート/システム相当は決定的ブロック） |
 | `git-add-secret-blocker.py` | PreToolUse(Bash) | `git add` による秘匿ファイル（.env/鍵/認証情報）のステージングをブロック |
@@ -155,4 +155,4 @@ claude-core が持つのは `rules/` `hooks/` `skills/` のみ（agents/commands
 | `settings.json` が JSON として壊れている | マージをスキップし警告を表示。既存ファイルはバイト単位で不変（`installer.py: merge_settings`） |
 | manifest（`.claude-core.manifest.json`）が壊れている/読めない | 警告を表示し「未インストール」として扱う |
 | hook 内 Python の予期せぬ例外 | 各 hook の設計原則として `exit 0`（Claude を止めない） |
-| 意図的なブロック | 各 hook が個別に `exit 2`（doc-blocker・mass-delete-blocker・opus-execution-guard 等。secret-detection は検出のみで exit 2 なし） |
+| 意図的なブロック | 各 hook が個別に `exit 2`（doc-blocker・mass-delete-blocker・main-loop-execution-guard 等。secret-detection は検出のみで exit 2 なし） |

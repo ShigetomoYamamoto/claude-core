@@ -28,7 +28,7 @@ engineering・work-agent はそれぞれ対象プロジェクトへ個別イン�
 
 | ディレクトリ/ファイル | 内容 |
 |---|---|
-| `hooks/` | ドメイン中立の安全装置（シークレット検出・秘匿ファイルのステージ防止・doc 生成ブロック・大量削除確認・opus-execution-guard） |
+| `hooks/` | ドメイン中立の安全装置（シークレット検出・秘匿ファイルのステージ防止・doc 生成ブロック・大量削除確認・main-loop-execution-guard） |
 | `rules/` | ドメイン中立の運用ルール（answer-only・collaboration-style・claude-efficiency・doc-language・memory・role-separation・safety-irreversible・secret-hygiene） |
 | `skills/` | ドメイン中立スキル（3-line-contract, memory-dream） |
 | `docs/` | 要件定義・アーキテクチャ・ADR・移行資料（`docs/migration/`） |
@@ -53,7 +53,7 @@ claude-core はこれら2つの foundation が乗る土台（ドメイン中立�
 
 - `env.CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS: "1"` — 複数エージェントの並列実行を有効化
 - `permissions.defaultMode: "auto"` — ほとんどの操作を自動承認
-- フック: PreToolUse（opus-execution-guard・doc-blocker・mass-delete-blocker・git-add-secret-blocker）、PostToolUse（secret-detection）
+- フック: PreToolUse（main-loop-execution-guard・doc-blocker・mass-delete-blocker・git-add-secret-blocker）、PostToolUse（secret-detection）
 - `install.py` が `__TARGET__` を実パスへ解決したうえで `~/.claude/settings.json` へキー単位マージする（live の個人設定・他 foundation の配線は上書きしない）
 
 git/gh 権限や開発/業務プラグインの有効化は claude-engineering / claude-work-agent 側の settings-fragment が持つ（core は持たない）。
