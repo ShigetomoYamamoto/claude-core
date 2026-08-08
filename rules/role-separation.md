@@ -97,13 +97,6 @@ Browser automation and repeated MCP execution belong to Sonnet by default:
 Example: designing a Playwright scenario stays on Sonnet; escalate only if the
 scenario surfaces a non-obvious architecture question.
 
-## loop-engineering note (engineering foundation only)
-
-The TDD/implementation loop mechanics that apply this principle (e.g. the
-implementation phase of a test-driven loop being blocked on a thinking-tier
-model) live in `skills/loop-engineering/` in the claude-engineering foundation,
-not here — this file states only the underlying model-role principle it depends on.
-
 ## Related
 
 - `rules/claude-efficiency.md` — model performance/cost guidance and effort tiering (single source of truth; do not duplicate here)
@@ -112,5 +105,6 @@ not here — this file states only the underlying model-role principle it depend
   claude-engineering foundation's `loop-safety.md`, not here)
 - [ADR-016](../docs/adr/016-opus-execution-guard.md) — original guard decision & implementation detail
 - [ADR-020](../docs/adr/020-thinking-tier-execution-guard.md) — guard scope extended to the thinking tier (Fable/Mythos)
-- [ADR-024](../docs/adr/024-sonnet-default-main-loop.md) — default flipped to Sonnet main loop; escalation triggers; guard mechanism unchanged
+- [ADR-024](../docs/adr/024-sonnet-default-main-loop.md) — default flipped to Sonnet main loop; escalation triggers
+- [ADR-026](../docs/adr/026-execution-guard-role-axis.md) — guard axis changed from model to role; the model check and transcript read were removed
 - `hooks/opus-execution-guard.py` — implementation

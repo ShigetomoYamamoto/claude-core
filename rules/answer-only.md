@@ -18,6 +18,6 @@ and propose — but do NOT edit/create files, run mutating commands, or commit.
 ## Relation
 
 - A skill or command the user invoked IS an explicit request for its stated purpose;
-  acting within that scope does not violate answer-only (see `skills/loop-engineering/SKILL.md`).
+  acting within that scope does not violate answer-only.
 - Irreversible / outward-facing steps (push, deploy, delete, external send) still need
   confirmation even after a request — see `rules/loop-safety.md`.
