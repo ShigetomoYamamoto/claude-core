@@ -20,7 +20,7 @@
 - Hardest cross-cutting analysis that must fit one context (e.g. knowledge-base consolidation, system-wide design review)
 - Maximum-effort reasoning sessions
 
-**Role separation:** Sonnet/Haiku is the default execution layer; the thinking tier (Fable 5 / Opus) is escalation-only for the trigger conditions in `rules/role-separation.md`. The automatic enforcement via `hooks/main-loop-execution-guard.py` blocks the thinking tier from executing whenever it's active, regardless of why (guard scope: ADR-020, framing: ADR-024).
+**Role separation:** Sonnet/Haiku is the default execution layer; the thinking tier (Fable 5 / Opus) is escalation-only for the trigger conditions in `rules/role-separation.md`. Enforcement is a separate axis: `hooks/main-loop-execution-guard.py` blocks the **main loop** — on every model, not only the thinking tier — from editing and from state-changing Bash, so execution is delegated to a subagent (axis: ADR-026, naming: ADR-027).
 
 ## Effort Tiering
 
