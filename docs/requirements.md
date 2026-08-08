@@ -29,7 +29,7 @@ engineering / work-agent はこの土台の上に、それぞれのドメイン�
 | `collaboration-style.md` | 批判的な相談相手としての振る舞い・回答の形・言語方針 |
 | `claude-efficiency.md` | モデル選択（thinking tier と Sonnet/Haiku の役割分担の前提） |
 | `memory.md` | アウターループ学習（何を永続化するか） |
-| `role-separation.md` | 思考ティアは思考・Sonnet/Haiku は実行。opus-execution-guard で強制 |
+| `role-separation.md` | 思考ティアは思考・Sonnet/Haiku は実行。main-loop-execution-guard で強制 |
 | `safety-irreversible.md` | 不可逆・外向き操作は人間確認、有界な自走、maker≠checker |
 | `secret-hygiene.md` | 秘密情報の基本衛生（環境変数/keychain・.gitignore） |
 
@@ -38,7 +38,7 @@ engineering / work-agent はこの土台の上に、それぞれのドメイン�
 
 | hook | タイミング | 役割 |
 |---|---|---|
-| `opus-execution-guard.py` | PreToolUse(Edit系/Bash) | 思考ティアの編集・変更系 Bash をブロック |
+| `main-loop-execution-guard.py` | PreToolUse(Edit系/Bash) | 思考ティアの編集・変更系 Bash をブロック |
 | `doc-blocker.py` | PreToolUse(Write) | 許可外の新規 .md/.txt 生成を阻止 |
 | `mass-delete-blocker.py` | PreToolUse(Bash) | 再帰/大量削除を確認、ルート/システムは決定的ブロック |
 | `git-add-secret-blocker.py` | PreToolUse(Bash) | 秘匿ファイルの `git add` をブロック |

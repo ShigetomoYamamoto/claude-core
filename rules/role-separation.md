@@ -27,9 +27,9 @@ or Opus) rather than self-certifying — see `rules/safety-irreversible.md`. Mod
 cost/perf detail and effort tiering live in `rules/claude-efficiency.md` (single
 source of truth — this file defines only the role split).
 
-## Enforcement: the opus-execution-guard hook
+## Enforcement: the main-loop-execution-guard hook
 
-`hooks/opus-execution-guard.py` ([ADR-016](../docs/adr/016-opus-execution-guard.md),
+`hooks/main-loop-execution-guard.py` ([ADR-016](../docs/adr/016-opus-execution-guard.md),
 extended by [ADR-020](../docs/adr/020-thinking-tier-execution-guard.md), reframed by
 [ADR-024](../docs/adr/024-sonnet-default-main-loop.md), **axis replaced by
 [ADR-026](../docs/adr/026-execution-guard-role-axis.md)**) enforces the split
@@ -107,4 +107,4 @@ scenario surfaces a non-obvious architecture question.
 - [ADR-020](../docs/adr/020-thinking-tier-execution-guard.md) — guard scope extended to the thinking tier (Fable/Mythos)
 - [ADR-024](../docs/adr/024-sonnet-default-main-loop.md) — default flipped to Sonnet main loop; escalation triggers
 - [ADR-026](../docs/adr/026-execution-guard-role-axis.md) — guard axis changed from model to role; the model check and transcript read were removed
-- `hooks/opus-execution-guard.py` — implementation
+- `hooks/main-loop-execution-guard.py` — implementation

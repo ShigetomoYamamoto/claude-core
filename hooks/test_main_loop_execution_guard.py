@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""opus-execution-guard.py の契約テスト（stdlib unittest・依存追加なし）。
+"""main-loop-execution-guard.py の契約テスト（stdlib unittest・依存追加なし）。
 
-実行: python3 -m unittest hooks/test_opus_execution_guard.py
-      （または python3 hooks/test_opus_execution_guard.py）
+実行: python3 -m unittest hooks/test_main_loop_execution_guard.py
+      （または python3 hooks/test_main_loop_execution_guard.py）
 
 hook は PreToolUse で stdin から JSON を受け取り、
 メインループ(agent_id なし)が Edit/Write/MultiEdit/NotebookEdit または
@@ -17,7 +17,7 @@ import subprocess
 import tempfile
 import unittest
 
-HOOK = os.path.join(os.path.dirname(os.path.abspath(__file__)), "opus-execution-guard.py")
+HOOK = os.path.join(os.path.dirname(os.path.abspath(__file__)), "main-loop-execution-guard.py")
 
 
 def write_transcript(records: list) -> str:
