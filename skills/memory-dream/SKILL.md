@@ -19,7 +19,7 @@ description: 蓄積したナレッジベース全体——公式 auto-memory（~
 ## 実行モデル（推論=Fable / 実行=委譲）
 
 - **推論・分析**（丸ごと読み込んで重複・矛盾・陳腐化を見抜く）は **Fable**（最上位の推論モデル）が担う。コンテキストが大きいので、可能なら専用セッションで層・カテゴリ単位に読み込む。
-- **実行**（記憶ファイルの編集・削除、提案のブランチ化・コミット）は **Sonnet 実行エージェントへ委譲**（`executor` / `git-runner`）。main-loop の思考ティアモデル（Fable/Opus）は `opus-execution-guard` により Edit/Write/変更系 Bash がブロックされる（ADR-016 / ADR-020）ため、委譲で進めるのが正。`rules/role-separation.md` 準拠。
+- **実行**は対象で分かれる。**記憶ファイル（`~/.claude/projects/*/memory/`）の編集・削除は main-loop が直接行ってよい** — `main-loop-execution-guard.py` の例外パスに含まれる（ADR-026）。一方、**提案のブランチ化・コミット等の VCS 操作は Sonnet 実行エージェントへ委譲**する（`git-runner`）。main-loop はモデルを問わず変更系 Bash がブロックされるため（ADR-026 / ADR-027）、委譲で進めるのが正。`rules/role-separation.md` 準拠。
 
 ## 1. 収集（Mine）— ナレッジベースを丸ごと集める
 
