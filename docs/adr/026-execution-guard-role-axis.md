@@ -4,6 +4,8 @@
 
 **日付**: 2026-08-06
 
+**部分的に置き換える対象**: [ADR-016](./016-opus-execution-guard.md) / [ADR-020](./020-thinking-tier-execution-guard.md) / [ADR-024](./024-sonnet-default-main-loop.md)（判定軸を「モデル」から「役割」へ置き換える点）
+
 ## コンテキスト
 
 ADR-016 で導入し ADR-020 で思考ティア全体に拡張した `hooks/opus-execution-guard.py` は、

@@ -6,6 +6,8 @@
 
 **部分的に置き換える対象**: [ADR-016](./016-opus-execution-guard.md)（ガード対象を Opus のみとしていた点）
 
+> **注記（2026-08-09）**: 本 ADR が拡張した「思考ティアを対象とする」判定軸は、[ADR-026](./026-execution-guard-role-axis.md) で役割軸（`agent_id` の有無）へ置き換えられた。モデル名による判定は実装から削除されている。
+
 ## コンテキスト
 
 [ADR-016](./016-opus-execution-guard.md) は「思考モデルは実行しない」を機械的に強制するため、`hooks/opus-execution-guard.py` でメインループの Opus（`claude-opus-*` 前方一致）の Edit/Write/変更系 Bash をブロックした。
