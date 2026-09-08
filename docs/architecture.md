@@ -75,7 +75,7 @@ claude-engineering foundation 側のアーキテクチャに移動しました�
 
 | hook | タイミング | 責務 |
 |---|---|---|
-| `main-loop-execution-guard.py` | PreToolUse(Edit/Write/MultiEdit/NotebookEdit, Bash) | 思考ティア（Opus/Fable/Mythos）の編集・変更系 Bash 実行をブロック |
+| `main-loop-execution-guard.py` | PreToolUse(Edit/Write/MultiEdit/NotebookEdit, Bash) | メインループ（agent_id なし）の編集・変更系 Bash 実行をモデル問わずブロック（ADR-026）。サブエージェントは通過。例外は auto-memory と scratchpad |
 | `doc-blocker.py` | PreToolUse(Write) | 許可リスト外の新規 `.md` / `.txt` 生成を阻止（既存ファイルの編集は許可） |
 | `mass-delete-blocker.py` | PreToolUse(Bash) | 再帰削除・大量削除を検知し実行前に確認（ルート/システム相当は決定的ブロック） |
 | `git-add-secret-blocker.py` | PreToolUse(Bash) | `git add` による秘匿ファイル（.env/鍵/認証情報）のステージングをブロック |
