@@ -46,7 +46,9 @@ whether `agent_id` is present.
   (`~/.claude/projects/*/memory/`) and the session scratchpad. Nothing else. The
   boundary is fixed absolute paths, never a judgment about whether a file is
   "config" or "product code" — in a config repo like claude-core those are the same
-  files (ADR-026).
+  files (ADR-026). For Bash these two paths are honored only when redirection is the
+  *sole* mutating element and the target is an absolute path under them — `rm` / `cp`
+  / `git add` stay blocked even inside those paths (ADR-028).
 - **Always allowed**: read-only Bash (`ls`, `cat`, `git status|diff|log`), test /
   lint / typecheck runs, redirection to `/dev/null`, and `Agent` delegation. The
   main loop keeps its eyes so it can verify what the execution layer reports
@@ -107,4 +109,5 @@ scenario surfaces a non-obvious architecture question.
 - [ADR-020](../docs/adr/020-thinking-tier-execution-guard.md) — guard scope extended to the thinking tier (Fable/Mythos)
 - [ADR-024](../docs/adr/024-sonnet-default-main-loop.md) — default flipped to Sonnet main loop; escalation triggers
 - [ADR-026](../docs/adr/026-execution-guard-role-axis.md) — guard axis changed from model to role; the model check and transcript read were removed
+- [ADR-028](../docs/adr/028-command-string-guard-limits.md) — the guard judges command strings, not effects; the norm is the primary defense and the pattern layer is knowingly incomplete
 - `hooks/main-loop-execution-guard.py` — implementation
