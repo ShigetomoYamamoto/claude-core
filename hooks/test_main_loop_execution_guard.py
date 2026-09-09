@@ -13,6 +13,7 @@ hook は PreToolUse で stdin から JSON を受け取り、
 """
 import json
 import os
+import shutil
 import subprocess
 import tempfile
 import unittest
@@ -327,22 +328,208 @@ class OpusExecutionGuardTest(unittest.TestCase):
         cmd = 'echo "foo;mkdir bar"'
         self.assertEqual(run_hook("Bash", {"command": cmd}, t), 0)
 
-    # --- ケース46: 既知の検出漏れ — 引用符内サブシェル(sh -c "...; rm -rf x")の破壊操作は検出できない ---
-    # これは is_mutating_bash のコメントに明記した意図的な代償であり、バグではない。
-    # クォート内を空白に置換してから判定するため、引用符の中に隠れた ; rm -rf は見えなくなる。
-    # 検出漏れを許容する代わりに grep "cp\|mv" 等の誤検知を減らす選択をしたため(ADR-006 の
-    # fail-open と同じ判断)。将来 sh -c 経由のコマンドインジェクションに対応する場合は
-    # このテストの期待値を更新すること。
-    def test_46_known_gap_quoted_subshell_mutation_not_detected(self):
+    # --- ケース46: sh -c に隠れた破壊操作 — ADR-028 で検出するようになった ---
+    # 以前は「既知の検出漏れ」として exit 0 を固定していた(クォート内を空白へ置換するため
+    # 引用符の中の ; rm -rf が見えなかった)。ADR-028 で、呼び出し形式が sh -c のときだけ
+    # クォートを外した写しも判定にかけるようにしたため、現在はブロックされる。
+    # 形式が現れない難読化(変数組み立て・base64 経由等)は引き続き検出できない。
+    def test_46_quoted_subshell_mutation_now_detected(self):
         t = self.make_transcript([opus_assistant("claude-opus-4-8")])
         cmd = 'sh -c "foo; rm -rf /tmp/x"'
-        self.assertEqual(run_hook("Bash", {"command": cmd}, t), 0)
+        self.assertEqual(run_hook("Bash", {"command": cmd}, t), 2)
 
     # --- ケース47: 引用符の外にある本物の破壊操作は引き続きブロックされる ---
     def test_47_unquoted_mutation_still_blocked(self):
         t = self.make_transcript([opus_assistant("claude-opus-4-8")])
         cmd = 'ls; rm -rf build'
         self.assertEqual(run_hook("Bash", {"command": cmd}, t), 2)
+
+
+class CommandEffectsGuardTest(unittest.TestCase):
+    """_command_effects.py 由来の検出(ADR-028)の契約テスト。
+
+    - インタプリタへのインラインコード/ヒアドキュメント経由の書き込み・削除がブロックされること。
+    - 例外パス(auto-memory / scratchpad)へのリダイレクトのみで構成される Bash が通ること(#103)。
+    - 例外パス配下でも rm/cp 等の変更系トークンが混ざれば引き続きブロックされること(回帰)。
+    """
+
+    def setUp(self):
+        self._paths = []
+
+    def tearDown(self):
+        for p in self._paths:
+            try:
+                os.unlink(p)
+            except OSError:
+                pass
+
+    def make_transcript(self, records: list) -> str:
+        path = write_transcript(records)
+        self._paths.append(path)
+        return path
+
+    def memory_path(self) -> str:
+        """auto-memory の許可パス例を組む(実行環境依存を避けるため expanduser を使う)。"""
+        return os.path.join(
+            os.path.expanduser("~"), ".claude", "projects", "some-project",
+            "memory", "a.md",
+        )
+
+    # --- 通過(メインループ, exit 0): 例外パスへのリダイレクトのみの Bash ---
+    def test_c01_redirect_to_memory_path_allowed(self):
+        t = self.make_transcript([opus_assistant()])
+        cmd = f"cat >> {self.memory_path()}"
+        self.assertEqual(run_hook("Bash", {"command": cmd}, t), 0)
+
+    def test_c02_redirect_to_scratchpad_allowed(self):
+        t = self.make_transcript([opus_assistant()])
+        cmd = "echo x > /tmp/claude-501/abc/def/scratchpad/f.txt"
+        self.assertEqual(run_hook("Bash", {"command": cmd}, t), 0)
+
+    # --- 通過(メインループ, exit 0): 読み取り専用のインラインコード ---
+    def test_c03_python_inline_pure_computation_allowed(self):
+        t = self.make_transcript([opus_assistant()])
+        cmd = 'python3 -c "print(1 + 1)"'
+        self.assertEqual(run_hook("Bash", {"command": cmd}, t), 0)
+
+    def test_c04_python_inline_read_only_open_allowed(self):
+        t = self.make_transcript([opus_assistant()])
+        cmd = "python3 -c \"print(open('f').read())\""
+        self.assertEqual(run_hook("Bash", {"command": cmd}, t), 0)
+
+    def test_c05_python_inline_stdout_write_allowed(self):
+        t = self.make_transcript([opus_assistant()])
+        cmd = 'python3 -c "import sys; sys.stdout.write(\'x\')"'
+        self.assertEqual(run_hook("Bash", {"command": cmd}, t), 0)
+
+    # --- 回帰再確認: 既存挙動を壊していないこと ---
+    def test_c06_grep_redirect_devnull_still_allowed(self):
+        t = self.make_transcript([opus_assistant()])
+        self.assertEqual(run_hook("Bash", {"command": "grep -rn x . 2>/dev/null"}, t), 0)
+
+    def test_c07_ls_redirect_devnull_still_allowed(self):
+        t = self.make_transcript([opus_assistant()])
+        self.assertEqual(run_hook("Bash", {"command": "ls -la > /dev/null"}, t), 0)
+
+    def test_c08_git_status_still_allowed(self):
+        t = self.make_transcript([opus_assistant()])
+        self.assertEqual(run_hook("Bash", {"command": "git status"}, t), 0)
+
+    def test_c09_git_diff_head_still_allowed(self):
+        t = self.make_transcript([opus_assistant()])
+        self.assertEqual(run_hook("Bash", {"command": "git diff HEAD"}, t), 0)
+
+    # --- ブロック(メインループ, exit 2): インタプリタ経由の書き込み・削除 ---
+    def test_c10_python_inline_os_remove_blocked(self):
+        t = self.make_transcript([opus_assistant()])
+        cmd = "python3 -c \"import os; os.remove('/etc/hosts')\""
+        self.assertEqual(run_hook("Bash", {"command": cmd}, t), 2)
+
+    def test_c11_python_inline_open_write_blocked(self):
+        t = self.make_transcript([opus_assistant()])
+        cmd = "python3 -c \"open('out.txt','w').write('x')\""
+        self.assertEqual(run_hook("Bash", {"command": cmd}, t), 2)
+
+    def test_c12_node_inline_fs_unlink_blocked(self):
+        t = self.make_transcript([opus_assistant()])
+        cmd = 'node -e "fs.unlinkSync(\'a\')"'
+        self.assertEqual(run_hook("Bash", {"command": cmd}, t), 2)
+
+    def test_c13_sh_c_hidden_rm_blocked(self):
+        t = self.make_transcript([opus_assistant()])
+        cmd = 'sh -c "cd /tmp && rm -rf foo"'
+        self.assertEqual(run_hook("Bash", {"command": cmd}, t), 2)
+
+    def test_c14_python_heredoc_write_blocked(self):
+        t = self.make_transcript([opus_assistant()])
+        cmd = "python3 - <<'PY'\nopen('out.txt', 'w').write('x')\nPY"
+        self.assertEqual(run_hook("Bash", {"command": cmd}, t), 2)
+
+    # --- ブロック(メインループ, exit 2): リダイレクト先が例外パス外 ---
+    def test_c15_redirect_outside_allowed_path_blocked(self):
+        t = self.make_transcript([opus_assistant()])
+        self.assertEqual(run_hook("Bash", {"command": "cat >> /Users/x/notes.md"}, t), 2)
+
+    def test_c16_redirect_relative_path_blocked(self):
+        t = self.make_transcript([opus_assistant()])
+        self.assertEqual(run_hook("Bash", {"command": "cat >> ./relative.md"}, t), 2)
+
+    def test_c17_redirect_env_var_expansion_blocked(self):
+        t = self.make_transcript([opus_assistant()])
+        cmd = "cat >> $HOME/.claude/projects/foo/memory/x.md"
+        self.assertEqual(run_hook("Bash", {"command": cmd}, t), 2)
+
+    # --- ブロック(メインループ, exit 2): 例外パス配下でも rm/cp は通さない(重要な回帰テスト) ---
+    def test_c18_rm_under_memory_path_still_blocked(self):
+        t = self.make_transcript([opus_assistant()])
+        p = os.path.join(os.path.expanduser("~"), ".claude", "projects", "foo", "memory", "x.md")
+        self.assertEqual(run_hook("Bash", {"command": f"rm -f {p}"}, t), 2)
+
+    def test_c19_cp_into_memory_path_still_blocked(self):
+        t = self.make_transcript([opus_assistant()])
+        p = os.path.join(os.path.expanduser("~"), ".claude", "projects", "foo", "memory", "b")
+        self.assertEqual(run_hook("Bash", {"command": f"cp a {p}"}, t), 2)
+
+    # --- サブエージェント(agent_id あり)はすべて通過 ---
+    def test_c20_subagent_all_allowed(self):
+        t = self.make_transcript([opus_assistant()])
+        memory_x = os.path.join(os.path.expanduser("~"), ".claude", "projects", "foo", "memory", "x.md")
+        commands = [
+            f"cat >> {self.memory_path()}",
+            "echo x > /tmp/claude-501/abc/def/scratchpad/f.txt",
+            "python3 -c \"import os; os.remove('/etc/hosts')\"",
+            'sh -c "cd /tmp && rm -rf foo"',
+            "cat >> /Users/x/notes.md",
+            f"rm -f {memory_x}",
+        ]
+        for cmd in commands:
+            self.assertEqual(
+                run_hook("Bash", {"command": cmd}, t, agent_id="agent-abc123"), 0,
+                msg=f"subagent should pass: {cmd}",
+            )
+
+
+class CommandEffectsModuleMissingGuardTest(unittest.TestCase):
+    """_command_effects.py が import できない環境でも、guard は従来どおりの
+    検出(rm 等のトークン解析・リダイレクト検出)だけで動き続けることを確認する(ADR-028)。
+
+    HOOK 単体を _command_effects.py のない一時ディレクトリへコピーして起動する
+    (元ディレクトリの hooks/__pycache__ は巻き込まない)。
+    """
+
+    def setUp(self):
+        self._tmpdir = tempfile.mkdtemp(prefix="guard_no_effects_")
+        self._copied_hook = os.path.join(self._tmpdir, "main-loop-execution-guard.py")
+        shutil.copy(HOOK, self._copied_hook)
+
+    def tearDown(self):
+        shutil.rmtree(self._tmpdir, ignore_errors=True)
+
+    def run_copied_hook(self, tool_input: dict) -> subprocess.CompletedProcess:
+        payload = {
+            "tool_name": "Bash",
+            "tool_input": tool_input,
+            "transcript_path": "/nonexistent/transcript.jsonl",
+        }
+        return subprocess.run(
+            ["python3", self._copied_hook],
+            input=json.dumps(payload),
+            capture_output=True,
+            text=True,
+        )
+
+    def test_01_degraded_rm_still_blocked(self):
+        proc = self.run_copied_hook({"command": "rm -rf x"})
+        self.assertEqual(proc.returncode, 2)
+
+    def test_02_degraded_git_status_still_allowed(self):
+        proc = self.run_copied_hook({"command": "git status"})
+        self.assertEqual(proc.returncode, 0)
+
+    # --- 劣化の裏取り: フォールバックが効いていなければ通らないはずの入力が通ることを確認 ---
+    def test_03_degraded_python_inline_os_remove_not_detected(self):
+        proc = self.run_copied_hook({"command": "python3 -c \"import os; os.remove('a')\""})
+        self.assertEqual(proc.returncode, 0)
 
 
 if __name__ == "__main__":

@@ -159,5 +159,178 @@ class MassDeleteBlockerTest(unittest.TestCase):
         self.assertEqual(proc.returncode, 2)
 
 
+class CommandEffectsMassDeleteTest(unittest.TestCase):
+    """_command_effects.py 由来の検出(ADR-028)の契約テスト。
+
+    - インタプリタ経由の削除(python3 -c "os.remove(...)" 等)を ask で捕捉すること。
+    - sh -c に隠れた rm -r も ask で捕捉すること。
+    - パス1(破滅的ターゲット判定)はトークン解析のみに留め、grep 等の文字列一致では
+      deny されないこと(誤ブロックを避ける・ADR-028)。
+    """
+
+    def test_c01_python_inline_os_remove_asks(self):
+        proc = run_hook_full('python3 -c "import os; os.remove(\'a\')"', DEFAULT_CWD)
+        self.assertEqual(proc.returncode, 0)
+        out = json.loads(proc.stdout)
+        self.assertEqual(out["hookSpecificOutput"]["permissionDecision"], "ask")
+
+    def test_c02_python_inline_shutil_rmtree_asks(self):
+        proc = run_hook_full('python3 -c "import shutil; shutil.rmtree(\'build\')"', DEFAULT_CWD)
+        self.assertEqual(proc.returncode, 0)
+        out = json.loads(proc.stdout)
+        self.assertEqual(out["hookSpecificOutput"]["permissionDecision"], "ask")
+
+    def test_c03_node_inline_fs_rmsync_asks(self):
+        proc = run_hook_full("node -e \"fs.rmSync('x', {recursive:true})\"", DEFAULT_CWD)
+        self.assertEqual(proc.returncode, 0)
+        out = json.loads(proc.stdout)
+        self.assertEqual(out["hookSpecificOutput"]["permissionDecision"], "ask")
+
+    def test_c04_sh_c_hidden_rm_rf_asks(self):
+        proc = run_hook_full('sh -c "rm -rf /tmp/foo"', DEFAULT_CWD)
+        self.assertEqual(proc.returncode, 0)
+        out = json.loads(proc.stdout)
+        self.assertEqual(out["hookSpecificOutput"]["permissionDecision"], "ask")
+
+    def test_c05_python_inline_no_delete_api_passthrough(self):
+        proc = run_hook_full("python3 -c \"print('hello')\"", DEFAULT_CWD)
+        self.assertEqual(proc.returncode, 0)
+        self.assertEqual(proc.stdout, "")
+
+    def test_c06_grep_mentioning_os_remove_not_interpreter_call(self):
+        proc = run_hook_full('grep -n "os.remove" app.py', DEFAULT_CWD)
+        self.assertEqual(proc.returncode, 0)
+        self.assertEqual(proc.stdout, "")
+
+    def test_c07_grep_string_containing_rm_rf_not_denied(self):
+        proc = run_hook_full('grep "rm -rf /" logfile', DEFAULT_CWD)
+        self.assertEqual(proc.returncode, 0)
+
+
+class ExpandedHomePathMassDeleteTest(unittest.TestCase):
+    """展開済みホーム絶対パス(/Users/<user> 等)への rm -rf も破滅的ターゲットとして
+    決定的ブロック(exit 2)されることの契約テスト。
+
+    既存バグ: is_catastrophic() は `~` / `$HOME` / `${HOME}` というリテラルの
+    トークンしか見ておらず、単一階層絶対パス判定 `^/[^/]+/?\\*?$` も2セグメント以上の
+    `/Users/<user>` を捕捉しない。結果、展開済み絶対パスで書かれたホーム削除が
+    ask 止まりになっていた。ホームパスはハードコードせず実行環境の実際の値から組み立てる。
+    """
+
+    HOME = os.path.realpath(os.path.expanduser("~"))
+
+    # --- 破滅的ターゲット: 即ブロック(exit 2) ---
+
+    def test_e01_rm_rf_expanded_home_denied(self):
+        proc = run_hook_full(f"rm -rf {self.HOME}", DEFAULT_CWD)
+        self.assertEqual(proc.returncode, 2)
+
+    def test_e02_rm_rf_expanded_home_trailing_slash_denied(self):
+        proc = run_hook_full(f"rm -rf {self.HOME}/", DEFAULT_CWD)
+        self.assertEqual(proc.returncode, 2)
+
+    def test_e03_rm_rf_expanded_home_glob_denied(self):
+        proc = run_hook_full(f"rm -rf {self.HOME}/*", DEFAULT_CWD)
+        self.assertEqual(proc.returncode, 2)
+
+    def test_e04_rm_rf_quoted_expanded_home_denied(self):
+        proc = run_hook_full(f'rm -rf "{self.HOME}"', DEFAULT_CWD)
+        self.assertEqual(proc.returncode, 2)
+
+    def test_e05_rm_rf_dot_with_cwd_home_denied(self):
+        # 相対指定(`.`)でも cwd がホームなら展開後にホームへ到達する。
+        proc = run_hook_full("rm -rf .", self.HOME)
+        self.assertEqual(proc.returncode, 2)
+
+    def test_e06_rm_rf_dotdot_dotdot_reaches_home_parent_denied(self):
+        # cwd = <HOME>/a/b から ../.. で /Users(単一階層の絶対パス)へ到達する。
+        nested_cwd = os.path.join(self.HOME, "a", "b")
+        proc = run_hook_full("rm -rf ../..", nested_cwd)
+        self.assertEqual(proc.returncode, 2)
+
+    # --- 既存の回帰: リテラルの ~ / $HOME / / / /usr は従来どおりブロックされ続ける ---
+
+    def test_e07_regression_rm_rf_root_denied(self):
+        proc = run_hook_full("rm -rf /", DEFAULT_CWD)
+        self.assertEqual(proc.returncode, 2)
+
+    def test_e08_regression_rm_rf_tilde_denied(self):
+        proc = run_hook_full("rm -rf ~", DEFAULT_CWD)
+        self.assertEqual(proc.returncode, 2)
+
+    def test_e09_regression_rm_rf_home_env_denied(self):
+        proc = run_hook_full("rm -rf $HOME", DEFAULT_CWD)
+        self.assertEqual(proc.returncode, 2)
+
+    def test_e10_regression_rm_rf_usr_denied(self):
+        proc = run_hook_full("rm -rf /usr", DEFAULT_CWD)
+        self.assertEqual(proc.returncode, 2)
+
+    # --- ホーム直下の個別ディレクトリ・許可リストは対象外(ask または素通り。exit 2 でないこと) ---
+
+    def test_e11_rm_rf_home_downloads_not_denied(self):
+        proc = run_hook_full(f"rm -rf {self.HOME}/Downloads", DEFAULT_CWD)
+        self.assertNotEqual(proc.returncode, 2)
+
+    def test_e12_rm_rf_home_nested_project_build_not_denied(self):
+        proc = run_hook_full(f"rm -rf {self.HOME}/dotfiles/claude-core/build", DEFAULT_CWD)
+        self.assertNotEqual(proc.returncode, 2)
+
+    def test_e13_rm_rf_node_modules_in_home_proj_allowed_silently(self):
+        proc = run_hook_full("rm -rf node_modules", os.path.join(self.HOME, "proj"))
+        self.assertNotEqual(proc.returncode, 2)
+        self.assertEqual(proc.stdout, "")
+
+    def test_e14_rm_rf_build_in_home_proj_allowed_silently(self):
+        proc = run_hook_full("rm -rf build", os.path.join(self.HOME, "proj"))
+        self.assertNotEqual(proc.returncode, 2)
+        self.assertEqual(proc.stdout, "")
+
+    def test_e15_ls_passthrough(self):
+        proc = run_hook_full("ls -la", DEFAULT_CWD)
+        self.assertEqual(proc.returncode, 0)
+        self.assertEqual(proc.stdout, "")
+
+
+class CommandEffectsModuleMissingMassDeleteTest(unittest.TestCase):
+    """_command_effects.py が import できない環境でも、mass-delete-blocker は
+    従来どおりの rm トークン解析だけで動き続けることを確認する(ADR-028)。
+
+    HOOK 単体を _command_effects.py のない一時ディレクトリへコピーして起動する
+    (元ディレクトリの hooks/__pycache__ は巻き込まない)。
+    """
+
+    def setUp(self):
+        self._tmpdir = tempfile.mkdtemp(prefix="mdb_no_effects_")
+        self._copied_hook = os.path.join(self._tmpdir, "mass-delete-blocker.py")
+        shutil.copy(HOOK, self._copied_hook)
+
+    def tearDown(self):
+        shutil.rmtree(self._tmpdir, ignore_errors=True)
+
+    def run_copied_hook(self, command: str, cwd: str) -> subprocess.CompletedProcess:
+        payload = {"tool_name": "Bash", "tool_input": {"command": command}, "cwd": cwd}
+        return subprocess.run(
+            ["python3", self._copied_hook],
+            input=json.dumps(payload),
+            capture_output=True,
+            text=True,
+        )
+
+    def test_01_degraded_rm_rf_root_still_denied(self):
+        proc = self.run_copied_hook("rm -rf /", DEFAULT_CWD)
+        self.assertEqual(proc.returncode, 2)
+
+    def test_02_degraded_ls_still_passthrough(self):
+        proc = self.run_copied_hook("ls", DEFAULT_CWD)
+        self.assertEqual(proc.returncode, 0)
+
+    # --- 劣化の裏取り: フォールバックが効いていなければ ask されるはずの入力が無反応になること ---
+    def test_03_degraded_python_inline_os_remove_not_detected(self):
+        proc = self.run_copied_hook('python3 -c "import os; os.remove(\'a\')"', DEFAULT_CWD)
+        self.assertEqual(proc.returncode, 0)
+        self.assertEqual(proc.stdout, "")
+
+
 if __name__ == "__main__":
     unittest.main()

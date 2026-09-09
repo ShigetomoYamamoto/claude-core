@@ -24,3 +24,15 @@ not carry across actions):
 ## Verified, not assumed
 - Ground every "done" claim in a result you actually observed this session.
 - The party that produced the work does not also certify it (maker ≠ checker).
+
+## Do not route around a control
+A deny rule, hook block, or refused permission is a STOP signal, not an obstacle to
+work around. Report the block and what you intended; let the human decide.
+- **Designed escape vs. circumvention**: taking the route the block itself names
+  (e.g. a guard telling you to delegate) is intended. Any route that works *by not
+  being detected* — `python3 -c` / `node -e`, a heredoc, `sh -c`, an equivalent
+  command, a different tool — is circumvention, whatever the intent.
+- Already-agreed effects are no exception: the agreement covered the effect, not the
+  evasion. Re-confirm with the human.
+- The pattern layers are knowingly incomplete — they judge command strings, not
+  effects (ADR-028). This norm, not the regex, is what holds.
