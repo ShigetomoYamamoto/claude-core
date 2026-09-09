@@ -2,20 +2,37 @@
 """PreToolUse(Bash): 再帰削除(rm -r)・大量削除を検知し、実行前に人間へ諾否を確認する。
 
 二層モデル(ADR-014 / loop-safety「物理層」)— 不可逆操作の最終判断は人間(不変条件4):
-- ルート/システム/ホーム相当(/ , /* , "/" , ~ , $HOME , /usr のような単一階層の絶対パス等)への
-  再帰削除は決定的ブロック(exit 2)= サーキットブレーカ。
+- ルート/システム/ホーム相当(/ , /* , "/" , ~ , $HOME , 展開済みのホーム絶対パス ,
+  /usr のような単一階層の絶対パス等)への再帰削除は決定的ブロック(exit 2)= サーキットブレーカ。
+  判定は生のトークンと展開後の絶対パスの両方に対して行う。
 - それ以外の再帰削除(rm -r / -rf / -fr / -fR / --recursive、フラグ分離・大文字も対象)、および
   ワイルドカード削除が THRESHOLD 件以上は permissionDecision="ask" を返し、実行前に確認させる。
 - ask は default/auto/acceptEdits/plan/bypass で確認を強制。人間不在(dontAsk/自走ヘッドレス)では
   deny 扱いで止まる(fail-closed = 人間がいなければ不可逆は実行しない、で正しい)。
 - 例外(緩和): 再生成可能な許可リスト(SAFE_BASENAMES / セッション scratchpad / $TMPDIR 配下)のみを
   対象とする再帰・ワイルドカード削除は ask を省略する。破滅的ターゲット判定は常に優先。
+
+インタプリタ経由の削除(`python3 -c "os.remove(...)"`)と `sh -c` に隠れた rm も、
+呼び出し形式と既知 API の同時出現で近似検出する(#100 / ADR-028)。文字列から効果を
+確定することはできないため、この網は意図的に不完全である。
 git 操作の不可逆ブロックは git-destructive-blocker.py が担う。
 
 検出は単一正規表現でなくトークン解析で行う(`rm` 語の確実な要求・フラグ集合の判定)。
 これは「rm を要求しない枝で誤検出」「分離フラグ -r -f の取りこぼし」を避けるため。
 """
 import json, sys, re, glob, os
+
+# hook は毎回のツール呼び出しで起動する。~/.claude/hooks/ に __pycache__ を作ると
+# installer の verify が UNKNOWN として拾ってしまうため、バイトコードを書かせない。
+sys.dont_write_bytecode = True
+
+# 共有ヘルパ(ADR-028)。欠けても従来の rm トークン解析のみで動作を続ける。
+try:
+    from _command_effects import DELETE_APIS, has_inline_code, has_inline_shell, unquote_all
+except Exception:                                    # pragma: no cover
+    DELETE_APIS = None
+    has_inline_code = has_inline_shell = lambda cmd: False
+    unquote_all = lambda cmd: cmd
 
 THRESHOLD = 10  # この件数以上のワイルドカード削除で確認を促す
 SEP = re.compile(r'&&|\|\||[;|&\n]')  # シェルのコマンド区切り
@@ -28,6 +45,7 @@ SAFE_BASENAMES = {
     '.pytest_cache', 'coverage', 'tmp',
 }
 SAFE_PATH_PREFIXES = ('/private/tmp/claude-', '/tmp/claude-')  # セッション scratchpad
+_HOME = os.path.realpath(os.path.expanduser('~'))  # 展開済みのホーム絶対パス
 
 
 def ask(reason):
@@ -71,6 +89,12 @@ def is_catastrophic(tok):
     if t in ('', '/', '/*'):
         return True
     if t in home_roots or t in tuple(h + '/*' for h in home_roots):
+        return True
+    # 展開済みのホーム絶対パス(/Users/<user>)もホーム相当として扱う。エージェントは `~` では
+    # なく展開済みの絶対パスでコマンドを組み立てることが多く、リテラルの `~` だけを見ていると
+    # ホームごと削除する指定が ask 止まりになっていた。ホーム直下の個別ディレクトリ
+    # (~/Downloads 等)は対象外 — 完全一致とその直下 glob だけを破滅的とみなす。
+    if t == _HOME or t == _HOME + '/*':
         return True
     # 単一階層の絶対パス(/usr, /etc, /home, /Users, /usr/* など)
     if re.fullmatch(r'/[^/]+/?\*?', t):
@@ -132,8 +156,25 @@ try:
 
     # パス1: 破滅的ターゲットへの再帰削除 → 即ブロック(他より優先)
     for flags, targets in rm_calls:
-        if is_recursive(flags) and any(is_catastrophic(t) for t in targets):
+        # 生のトークンと展開後の絶対パスの両方で判定する。`cd /Users/x && rm -rf .` や
+        # `rm -rf ../..` のように、相対指定でホーム/システムへ到達する経路を取りこぼさないため
+        # (is_safe_target は以前から両方を見ており、パス1だけが生トークンのみだった)。
+        if is_recursive(flags) and any(
+            is_catastrophic(t) or is_catastrophic(expand_path(t, cwd)) for t in targets
+        ):
             deny(f'🔴 rm -r でルート/システム/ホーム相当を削除しようとしました。\nコマンド: {cmd}')
+
+    # パス1.5: インタプリタ経由の削除(python3 -c "import os; os.remove(...)" 等)。
+    # rm 拒否ルールをブロックされた後、別経路で同じ削除が実行された事例への対応(#100)。
+    # 呼び出し形式と既知の削除 API の同時出現による近似であり、未知の手段は素通りする(ADR-028)。
+    if DELETE_APIS is not None and has_inline_code(cmd) and DELETE_APIS.search(cmd):
+        ask(f'インタプリタ経由の削除操作を検出しました(取り消せません)。実行してよいか確認してください。\nコマンド: {cmd}')
+
+    # sh -c "rm -rf x" のようにクォート内へ隠れた rm は素のトークン解析に載らない。
+    # 呼び出し形式が sh -c のときだけクォートを外した写しも解析対象に足す。
+    # 破滅的ターゲット判定(パス1 = 決定的ブロック)は誤ブロックを避けるため素の解析のみに留める(ADR-028)。
+    if has_inline_shell(cmd):
+        rm_calls = rm_calls + parse_rm_segments(unquote_all(cmd))
 
     # パス2: それ以外の再帰削除 → 実行前に確認(全ターゲットが再生成可能なら確認不要)
     for flags, targets in rm_calls:
