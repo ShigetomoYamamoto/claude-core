@@ -44,11 +44,20 @@
 **モデルを問わず** Edit/Write/変更系 Bash を実行できなくなった。主ループに残る動作は
 **読む・判断する・委譲する・検証する**（maker≠checker）だけである。
 
-Anthropic 自身が文書化している **Orchestrator パターン**（platform.claude.com
-"Optimizing for cost and intelligence"）は、この「実行しない・分解して委譲する席」に
-**フロンティアモデル**を置く（同ドキュメントの例: *"a Claude Fable 5.1 lead over 25 Claude Sonnet 5
-workers"*）。最安モデルではない。ADR-024 はその席に最安モデル（Sonnet）を置いたため、
-**ガードが機械的に強制している形（orchestrator）とモデル配置が噛み合っていない**。
+Anthropic 自身が文書化している **Orchestrator パターン**
+（[Optimizing for cost and intelligence](https://platform.claude.com/docs/en/about-claude/models/optimizing-for-cost-and-intelligence)、
+本文を 2026-09-09 に確認）は、この「実行しない・分解して委譲する席」に**フロンティアモデル**を置く:
+
+> "In the orchestrator strategy, **the frontier model holds the loop**. It decomposes the task,
+> dispatches subtasks to lower-cost worker models, and merges their results. The orchestrator's
+> own transcript stays short because workers absorb the token-heavy exploration, so most tokens
+> are billed at worker rates while the plan and synthesis still come from the frontier model."
+
+計測例も *"a Claude Fable 5.1 lead over 25 Claude Sonnet 5 workers"* であり、最安モデルをリード席に
+置く形ではない。同じモデル選択ガイド
+（[Choosing the right model](https://platform.claude.com/docs/en/about-claude/models/choosing-a-model)）も
+"Most workloads start with Claude Opus 5" と述べている。ADR-024 はその席に最安モデル（Sonnet）を
+置いたため、**ガードが機械的に強制している形（orchestrator）とモデル配置が噛み合っていない**。
 
 ここが柱1への構造的な反論である。**測定値そのものを争う必要はない**: SONNET_OK と分類された 82% は、
 ADR-026 以降は主ループが Opus であれ Sonnet であれ**どちらにせよ実行層へ委譲される仕事**である。
@@ -174,6 +183,13 @@ Opus にすることは、ADR-024 がまさに回避しようとしたクォー�
 3. Fable のプール消費が他モデルより速いという性質は今も同じか。
 4. `settings.json` の `model: opus[1m]` と `advisorModel: fable` は**意図した設定**か、
    未レビューのドリフトか。
+5. `settings.json` の `modelSettings` は `claude-opus-5` / `claude-sonnet-5` / `claude-fable-5` /
+   `claude-fable-5-1` の**全モデルに `effortLevel: xhigh`** を設定している。一方 Anthropic の
+   モデル選択ガイド（2026-09-09 確認）は「Fable 5.1 と Opus 5 は既定の `high` から始める」とし、
+   `xhigh` 推奨は Opus 4.8/4.7 に対するものである。`rules/claude-efficiency.md` の
+   「主ループの routine な orchestration は high で足りる」という文言とも食い違う。これも
+   `model: opus[1m]` と同時期の未レビューのドリフトか、意図した設定か。**本 PR では変更していない**
+   （文言整合のみがスコープ）。
 
 **オーナー回答（YYYY-MM-DD）**: （未記入）
 
@@ -205,6 +221,12 @@ Opus にすることは、ADR-024 がまさに回避しようとしたクォー�
   (iii) 実機設定のドリフト（それ自体は誤設定の可能性を排除できない）の3点である。
   → **フォローアップ**: 反転後7日間のクォータ消費と、主ループの判断品質（レビュー/修正ループに
   入ったか）を計測し、Issue #82 と同形式で記録する。
+- **引用した Orchestrator パターンは、第一にコスト最適化の文脈で書かれている。** 同ドキュメントの
+  計測例（Fable 5.1 リード＋Sonnet 5 ワーカー25体）はフロンティア単独構成に対して
+  **費用 47〜55% 減・スコア 10〜12 ポイント減**であり、「フロンティアをリード席に置けば品質が
+  最大化する」という主張ではない。本 ADR がこの引用から借りているのは**席の形**（フロンティアが
+  ループを保持し、ワーカーが実行を吸収する）であって、品質最大化の証明ではない。主ループの
+  判断品質が上がるという期待の根拠は上記 (c) の実運用報告であり、それは n=1 の定性報告にとどまる。
 - クォータ制約が未確認のまま（上記「未解決の問い」）。回答次第で決定を絞る必要がある。
 - 主ループが高価なモデルになるため、**規範のみで守られている区間のコスト影響が増える** — 特に
   MCP 経由のツール実行は hook が発火しない。第5項の Sonnet 固定が破られても機械的には検知されない。

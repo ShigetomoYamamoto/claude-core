@@ -25,6 +25,6 @@
 
 ## Effort Tiering
 
-- **Main chat** (interactive conversation, global `/effort`): the main loop runs on Opus by default, so **high** covers routine orchestration (read, judge, delegate, verify). Raise to **xhigh/max** only for judgment work that actually needs the depth — architecture/foundational calls, Fable-bar cases — not for every Opus turn.
+- **Main chat** (interactive conversation, global `/effort`): the main loop runs on Opus by default, so **high** covers routine orchestration (read, judge, delegate, verify) — Anthropic's own guidance starts Opus 5 and Fable 5.1 at the default `high` (`xhigh` is the recommendation for Opus 4.8/4.7, not Opus 5). Raise to **xhigh/max** only for judgment work that actually needs the depth — architecture/foundational calls, Fable-bar cases — not for every Opus turn.
 - **Subagents**: effort is set per-agent via frontmatter `effort:` (implementation lives in the engineering foundation, not here) — **xhigh** for judgment-heavy agents, **high** for review, **medium–high** for execution, **low** for doc-only work, **max** for a Fable-equivalent agent.
 - Per-agent `model:`/`effort:` is natively supported via frontmatter; a hook cannot override it — don't try to enforce effort tiering through `main-loop-execution-guard.py`.
