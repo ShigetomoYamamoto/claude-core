@@ -15,7 +15,8 @@
 インタプリタ経由の削除(`python3 -c "os.remove(...)"`)と `sh -c` に隠れた rm も、
 呼び出し形式と既知 API の同時出現で近似検出する(#100 / ADR-028)。文字列から効果を
 確定することはできないため、この網は意図的に不完全である。
-git 操作の不可逆ブロックは git-destructive-blocker.py が担う。
+git 操作の不可逆ブロック(reset --hard / clean -fd / push --force 等)は claude-engineering 側の
+git-destructive-blocker.py が担う。core には無い — git は開発専用であり core(ドメイン中立)の射程外。
 
 検出は単一正規表現でなくトークン解析で行う(`rm` 語の確実な要求・フラグ集合の判定)。
 これは「rm を要求しない枝で誤検出」「分離フラグ -r -f の取りこぼし」を避けるため。
