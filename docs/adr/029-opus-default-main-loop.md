@@ -1,0 +1,293 @@
+# ADR-029: モデル役割の既定を再反転する — 主ループは Opus 5、Sonnet/Haiku は実行層、Fable はさらなるエスカレーション
+
+**ステータス**: accepted
+
+**日付**: 2026-09-09
+
+**部分的に置き換える対象**: [ADR-024](./024-sonnet-default-main-loop.md)（「主ループの既定は Sonnet」という**既定モデルの向き**のみ。ADR-024 が同時に定めたエスカレーション概念の維持・maker≠checker・エフォート方針の枠組みは本 ADR でも維持する）
+
+> **注記（2026-09-09）**: ブロッキング項目だったプラン階層／クォータの確認が完了したため
+> proposed から accepted へ更新した（結果は「オーナー確認の結果」節）。**制約の構造は解消して
+> いないが実消費に余裕があり、決定は絞らずそのまま維持する**というのがオーナーの判断である。
+> `effortLevel: xhigh` の件のみ open item として残るが、本 ADR の決定をブロックしない。
+
+## コンテキスト
+
+### ADR-024 が実際に依拠した二本柱
+
+本 ADR は ADR-024 の**実際の**根拠に対して反論する（藁人形を立てない）。ADR-024 の決定は
+次の2つを土台にしていた。
+
+1. **品質の実測**（[Issue #82](https://github.com/ShigetomoYamamoto/claude-core/issues/82)、直近7日）:
+   思考ティア主ループの無作為サンプル (n=50) を定性分類し、SONNET_OK 82% / NEEDS_OPUS 14%（**下限**）/
+   OTHER 4%。ADR-024 自身が限界も明記していた — n=50・95%CI 約±10pt・単一評価者・NEEDS_OPUS は下限。
+2. **クォータ制約**（2026-07-22 時点の Anthropic 一次情報）: Team プレミアムシートは**週次共有プール＋
+   5時間枠が単一**で、Opus 専用枠のような分離はない。Fable 5 はプラン込みだが他モデルより速くプールを
+   消費する。ここから「共有プールである以上、安い方（Sonnet）に寄せれば常に有利で場合分けは不要」という
+   解釈が導かれた。
+
+この2本柱の組み合わせは、当時の前提の下では妥当な判断だった。本 ADR が主張するのは
+「測定が誤りだった」ではなく、**測定対象の母集団が ADR-026 で変わった**ことと、
+柱2（クォータ）が現在も成立するかを**まだ誰も確認していない**ことである。
+
+### 新たに得られた3つの事実
+
+**(a) 実機設定が既に独立してドリフトしている。** グローバル `~/.claude/settings.json` は
+`"model": "opus[1m]"` かつ `"advisorModel": "fable"` になっており、本リポジトリの `rules/` と ADR は
+追随していない。つまり周囲の既定は「Opus 主ループ ＋ Fable アドバイザ」へ既に動いている。
+
+ただし**このドリフトは制約が解除された証拠にはならない**。設定が変わった経緯は記録されておらず、
+別の場所での未レビューの誤設定である可能性も等しくある。証拠としては「規範と実機の不整合が
+存在する」ことまでしか言えない（→「未解決の問い」節）。
+
+**(b) 構造が変わった — 主ループは既に「実行できない席」になっている。** ADR-024 の測定は、
+主ループがまだ自分で編集・実行できた時代のものである。その後 [ADR-026](./026-execution-guard-role-axis.md)
+で `hooks/main-loop-execution-guard.py` の判定軸がモデルから役割へ変わり、主ループは
+**モデルを問わず** Edit/Write/変更系 Bash を実行できなくなった。主ループに残る動作は
+**読む・判断する・委譲する・検証する**（maker≠checker）だけである。
+
+Anthropic 自身が文書化している **Orchestrator パターン**
+（[Optimizing for cost and intelligence](https://platform.claude.com/docs/en/about-claude/models/optimizing-for-cost-and-intelligence)、
+本文を 2026-09-09 に確認）は、この「実行しない・分解して委譲する席」に**フロンティアモデル**を置く:
+
+> "In the orchestrator strategy, **the frontier model holds the loop**. It decomposes the task,
+> dispatches subtasks to lower-cost worker models, and merges their results. The orchestrator's
+> own transcript stays short because workers absorb the token-heavy exploration, so most tokens
+> are billed at worker rates while the plan and synthesis still come from the frontier model."
+
+計測例も *"a Claude Fable 5.1 lead over 25 Claude Sonnet 5 workers"* であり、最安モデルをリード席に
+置く形ではない。同じモデル選択ガイド
+（[Choosing the right model](https://platform.claude.com/docs/en/about-claude/models/choosing-a-model)）も
+"Most workloads start with Claude Opus 5" と述べている。ADR-024 はその席に最安モデル（Sonnet）を
+置いたため、**ガードが機械的に強制している形（orchestrator）とモデル配置が噛み合っていない**。
+
+ここが柱1への構造的な反論である。**測定値そのものを争う必要はない**: SONNET_OK と分類された 82% は、
+ADR-026 以降は主ループが Opus であれ Sonnet であれ**どちらにせよ実行層へ委譲される仕事**である。
+主ループに残る残差は、ADR-024 自身が「NEEDS_OPUS（下限）」と呼んだ判断スライスに寄っている。
+安い側に寄せる利得は委譲によって既に回収されており、主ループを安くすることで削れるのは
+判断品質の方になった。
+
+**(c) 実運用の失敗モードが、このミスマッチの予測どおりに出ている。** Sonnet 主ループでの
+リポジトリオーナーの実運用報告（2026-09-09、本 ADR のトリガ）:
+
+- 「入るべきときにレビュー/修正ループに入らない」
+- 「浅く推論して誤った答えを出す」
+
+いずれも**オーケストレータの判断の失敗**であり、実行の失敗ではない。実行は既に `model: sonnet` の
+サブエージェントが担っており、そこに問題は報告されていない。
+
+## 検討した選択肢
+
+1. **現状維持（Sonnet 主ループ既定）** — 実機設定（opus[1m]）と規範の乖離を放置し、報告された判断失敗
+   （レビュー/修正ループに入らない・浅い推論）に対して何の手当もしない。ADR-026 による母集団変化も
+   反映されない。
+2. **ADR を書かず `rules/` だけ実機に合わせる** — 最小工数だが、なぜ反転したかが残らず、次の棚卸しで
+   同じ議論を再演する。柱2（クォータ制約）を再確認する機会も失う。ADR-024 を明示的に上書きしない限り、
+   常時ロードされる `rules/` と `docs/adr/` が矛盾したままになる。
+3. **既定を Opus 5 主ループへ再反転し、Sonnet/Haiku を実行層の既定として維持、Fable は Opus からの
+   さらなるエスカレーション先として残す（採用）** — ガードが強制する orchestrator 形と配置を一致させ、
+   ADR-024 のエスカレーション概念（Fable ティア）も壊さない。
+4. **Fable を主ループ既定にする**（Anthropic の例に最も近い） — 却下。ADR-024 が記録した
+   「Fable は他モデルより速くプールを消費する」という制約は解消が確認されていない。Opus は
+   「判断席にフロンティア級を置く」効果と消費のバランス点として妥当であり、Fable は必要な場面に
+   限定して呼ぶ方が総量を制御できる。
+
+## 決定
+
+**選択肢3を採用する。**
+
+### 1. 主ループの既定を Opus 5 とする（ADR-024 の向きを反転）
+
+主ループ（= `agent_id` なし、実行不能な orchestrator 席）の既定モデルを **Opus 5** とする。
+主ループの仕事は分解・判断・委譲・検証であり、そこにフロンティア級の判断力を置く。
+
+### 2. 実行層は不変 — Sonnet/Haiku のまま
+
+実行層の既定は **Sonnet（軽量・高頻度なワーカーは Haiku）** で**一切変更しない**。本セッションで
+claude-engineering 側のエージェント定義を確認した結果:
+
+- 実行系はすべて `model: sonnet` を明示 — `executor` / `fixer` / `git-runner` / `tdd-guide` /
+  `build-error-resolver` / `e2e-runner` / `deploy-runner` / `migration-runner` / `rollback-runner` /
+  `reviewer` / `review-responder` / `refactor-cleaner` / `security-reviewer` / `task-analyst` / `planner`
+- 判断系は既に `model: opus` — `architect` / `requirements-analyst`（本 ADR の方向と整合的）
+- `doc-updater` は `model: haiku`
+
+したがって **サブエージェント定義側の変更は不要**。本 ADR のスコープは claude-core の
+`rules/` と `docs/adr/` のみである（claude-work-agent には現時点のチェックアウトに `agents/`
+ディレクトリが存在せず、実行系エージェントは claude-engineering 側に集約されている）。
+
+### 3. Fable は「Opus からのさらなるエスカレーション」として維持
+
+Fable ティアは**廃止しない**。ただし到達経路が Sonnet→Fable ではなく **Opus→Fable** になる。
+バーは従来どおり: 問題が**分割不能**で、**全体を単一コンテキストで**見る必要があり、**最大深度**の
+推論を要する場合（例: ナレッジベースの consolidation、システム全体の設計レビュー）。
+
+### 4. エスカレーション5条件は廃止せず、Opus→Fable の一次スクリーンへ再スコープ
+
+ADR-024 が明文化した5条件（曖昧要件の解決／アーキテクチャ・基盤判断／非自明・プラットフォーム依存の
+リスク／破壊的操作前の制約確認／重要変更の最終承認）は残す。ただし意味を正直に変える:
+
+- **旧**: 「安い主ループでは足りないので思考ティアを呼ぶ」条件。
+- **新**: これらは Opus 主ループの**既定の仕事**になった。5条件は Fable へ上げるかの**一次スクリーン**
+  として使い、**加えて**第3項の Fable バー（分割不能・単一コンテキスト・最大深度）を満たすことを
+  要求する（**AND 条件**）。5条件のどれか1つに当たるだけでは Fable へ上げる理由にならない。
+
+### 5. `rules/role-separation.md` の「Tool operations」— Sonnet 固定を維持する（明示的な決定）
+
+**決定: 実行（ステップを走らせる側）は Sonnet 固定のまま。設計（どう駆動するかを決める側）は
+主ループなので既定 Opus に従って動く。**
+
+理由:
+
+- ブラウザ自動化や反復 MCP 実行の**実行**部分は機械的で、賢いモデルを必要としない。既定の反転と
+  ともに Opus へ動かす利得がなく、消費だけ増える。
+- 一方「どう駆動するか」の設計は判断であり、主ループの仕事である。ここは既定に従って Opus になる
+  （従来の「Sonnet、ただし5条件ならエスカレーション」という書き方は主ループ既定の変更で意味を失う）。
+- **より重要な理由 — ここは機械的な歯止めが無い区間である。** `main-loop-execution-guard.py` は
+  Bash と `Edit|Write|MultiEdit|NotebookEdit` にしか発火せず、**MCP 経由のツール呼び出しには発火しない**
+  （`rules/role-separation.md` の "Physical-layer scope"、[ADR-014](./014-loop-engineering-as-discipline.md)）。
+  Sonnet 主ループ時代はこの節はコスト中立の話だったが、既定が Opus になると
+  **主ループが直接叩く MCP 呼び出しは、機械的に止まらないまま Opus で走る**。この節の Sonnet 固定は、
+  反転後は「唯一の歯止め」になる。**規範のみの担保であることを明記する**（hook が守っていると
+  主張してはならない）。
+
+### 6. `hooks/main-loop-execution-guard.py` はコード変更不要（検証済み）
+
+本セッションで確認した: 同 hook の実行ロジックにモデル名判定は残っていない（ADR-026 で
+`read_latest_model` / `is_thinking_model` と transcript 読み取りを削除済み）。`opus` / `sonnet` /
+`fable` の文字列は **docstring と、ブロック時のガイダンス文（「実行はサブエージェントに委譲して
+ください(Agent ツール, model: sonnet 等の実行層)」）にのみ**現れる。判定は `agent_id` の有無だけで
+行われるため、既定モデルの反転は hook の挙動に影響しない。**コード変更・テスト変更は不要。**
+
+### 7. ADR-024 の扱い
+
+ADR-024 の**本文は改変しない**。既存の 2026-08-09 注記（ADR-026 を指すもの）と同じスタイルで、
+ヘッダ直下に本 ADR を指す注記を追記するのみとする。
+
+## オーナー確認の結果（2026-09-09 完了）
+
+**プラン階層とクォータの現状。** 本 ADR の唯一のブロッキング項目だったため、決定を書いた時点では
+回答欄を空のまま残し、マージ前にオーナーへ確認した。以下はその結果である。なぜこれがブロッキング
+だったかを残すため、確認前の問題設定もそのまま記載する。
+
+ADR-024 の柱2は「Team プレミアムシートは週次共有プール＋5時間枠が単一、Opus 専用枠なし、
+Fable は消費が速い」だった。**この制約が今も変わらず成立しているなら、主ループの全ターンを既定で
+Opus にすることは、ADR-024 がまさに回避しようとしたクォータ枯渇リスクを再導入する。**
+さらに現在の実機設定は `advisorModel: fable` でもあるため、advisor 呼び出しは毎回
+「最も速くプールを消費する」と記録されたモデルに当たる。二重の消費増になる。
+
+`settings.json` の `opus[1m]` へのドリフトを**制約解除の証拠として扱ってはならない**。
+それは別の場所での未レビューの誤設定である可能性が等しくあり、経緯は記録されていない。
+
+確認した事項と結果:
+
+1. **プラン階層** — 変わらず **Team（プレミアムシート）**。2026-07-22 時点と同じ。
+2. **週次プール／5時間枠の分離** — **Opus 専用枠は存在しない。** 実機の Settings > Usage に出る
+   バーは「現在のセッション（5時間）」「週間制限: すべてのモデル」「週間制限: Fable」の**3本のみ**で、
+   Opus 単独の行はない（2026-09-09 実機確認）。一次情報側も Team プランについて
+   "a weekly usage limit that **applies across all models**" と明記している
+   （[What is the Team plan?](https://support.claude.com/en/articles/9266767-what-is-the-team-plan)）。
+   → **ADR-024 の柱2の構造はそのまま生きている。** Opus 主ループのターンは Sonnet 実行層と
+   同一プールを食い合う。
+3. **Fable の消費** — 速さの性質は不変だが、上限が明文化された:
+   "You can use up to **50%** of your weekly usage limits on Fable models at no extra cost.
+   They draw from your plan's regular weekly usage limits and **use them faster than other Claude
+   models**"（[Claude Fable models on your plan](https://support.claude.com/en/articles/15424964-claude-fable-models-on-your-plan)）。
+   実機でも Fable は専用バーを持ち、当該週の消費は **0%** だった。
+4. **`model: opus[1m]` / `advisorModel: fable` の経緯** — 依然として不明（オーナーも「Team
+   プレミアムシートはそのままだが、それ以外は分からない」と回答）。ただし本 ADR が既定を明示的に
+   決定したことで、`model: opus[1m]` は**規範に裏付けられた設定**になった。`advisorModel: fable` は
+   第3項の実測（当該週 0% 消費・専用サブ枠あり）を根拠に**据え置く**。
+5. **`effortLevel: xhigh` の全モデル設定** — **未解決のまま残す**（下記「残る open item」）。
+
+**実測（2026-09-09 18:41、Settings > Usage）**
+
+- 現在のセッション（5時間枠）: **31% 使用**、リセットまで約1時間10分
+- 週間制限「すべてのモデル」: **29% 使用**、リセットは木 19:59 → **7日サイクルの6日目で29%**
+- 週間制限「Fable」: **0% 使用**
+- 画面に「Claude Code の週間制限が50%高くなっています（**2026-09-13 まで**）」の一時引き上げ告知あり
+
+**オーナー回答（2026-09-09）**: 「このまま入れる」— **決定（第1〜7項）を絞らずそのまま維持する。**
+
+根拠: 構造的な制約は不変だが**実消費は逼迫していない**。既に `opus[1m]` で運用された期間を含めて
+6日目で29%であり、Opus 主ループが週次プールを枯渇させる兆候はない。したがって当初の想定分岐に
+挙げた3つの緩和策はいずれも採らない:
+
+- **`advisorModel` を Fable から下げる → 不要。** Fable は専用サブ枠（週次の50%上限）を持ち、
+  当該週の消費は 0%。現在の消費源ではない。
+- **`opus[1m]` の常用回避 → 採らない。** 週次・5時間枠ともに余裕があり、現時点で制約していない。
+- **反転を重い判断セッションのみに限定 → 採らない。** 実運用で報告された判断失敗を放置することに
+  なり、本 ADR の目的を損なう。
+
+ただし2点の留保を明記する:
+
+- **観測された余裕には下駄が履かせてある。** 上記の一時引き上げ（+50%、2026-09-13 まで）が分母を
+  膨らませており、通常上限に戻すと 29% は実質 43% 相当になる。
+- **真の圧迫点は週次プールより 5時間枠である。** Opus 主ループが自分で大量の読み込みを抱えると
+  5時間枠を焼く。ここは ADR-026 のガードが「実作業はサブへ委譲」を機械的に強制しているため
+  構造的に緩和されているが、規範が破られれば戻ってくるリスクである。
+
+### 残る open item（本 ADR の決定をブロックしない）
+
+`settings.json` の `modelSettings` が `claude-opus-5` / `claude-sonnet-5` / `claude-fable-5` /
+`claude-fable-5-1` の**全モデルに `effortLevel: xhigh`** を設定している点は未解決。一方 Anthropic の
+モデル選択ガイド（2026-09-09 確認）は「Fable 5.1 と Opus 5 は既定の `high` から始める」とし、
+`xhigh` 推奨は Opus 4.8/4.7 に対するものである。`rules/claude-efficiency.md` の「主ループの
+routine な orchestration は high で足りる」という文言とも食い違う。**本 PR では変更していない**
+（文言整合のみがスコープ）。`settings.json` 側の別件として扱う。
+
+## 結果
+
+### Positive
+
+- ガードが機械的に強制している orchestrator 形（主ループは実行しない）と、そこに座るモデルの配置が
+  一致する。Anthropic 文書化のパターンと同じ向きになる。
+- 報告された失敗モード（レビュー/修正ループに入らない・浅い推論）に直接効く。いずれも判断側の問題で、
+  判断席のモデルを上げることが最短の手当である。
+- 実機 `settings.json`（`opus[1m]`）と常時ロードされる `rules/` の乖離が解消し、規範と実態が一致する。
+- 実行層（Sonnet/Haiku）とサブエージェント定義に一切手を入れずに済む。安い実行層による費用抑制は維持。
+- Fable ティアと5条件を捨てないため、ADR-024 が残した「Sonnet 一辺倒にしない」という慎重さの資産が
+  そのまま Opus→Fable の形で継承される。
+
+### Negative（限界を正直に）
+
+- **本 ADR の証拠は ADR-024 より弱い。** 新しい n=50 の再測定は行っていない。根拠は
+  (i) 文書化されたパターンと現在のガード形の構造的整合、(ii) 単一の定性的な実運用報告、
+  (iii) 実機設定のドリフト（それ自体は誤設定の可能性を排除できない）の3点である。
+  → **フォローアップ**: 反転後7日間のクォータ消費と、主ループの判断品質（レビュー/修正ループに
+  入ったか）を計測し、Issue #82 と同形式で記録する。**計測開始は 2026-09-13 以降とする** —
+  それまで Claude Code の週間制限が一時的に +50% されており、早く始めると楽観側に偏った数字が出る。
+- **引用した Orchestrator パターンは、第一にコスト最適化の文脈で書かれている。** 同ドキュメントの
+  計測例（Fable 5.1 リード＋Sonnet 5 ワーカー25体）はフロンティア単独構成に対して
+  **費用 47〜55% 減・スコア 10〜12 ポイント減**であり、「フロンティアをリード席に置けば品質が
+  最大化する」という主張ではない。本 ADR がこの引用から借りているのは**席の形**（フロンティアが
+  ループを保持し、ワーカーが実行を吸収する）であって、品質最大化の証明ではない。主ループの
+  判断品質が上がるという期待の根拠は上記 (c) の実運用報告であり、それは n=1 の定性報告にとどまる。
+- **クォータ制約の構造は解消していない。** Opus 専用枠は存在せず、Opus 主ループは Sonnet 実行層と
+  同一の週次プールを食い合う（2026-09-09 実機確認）。現時点で実消費に余裕があるだけで、使用量が
+  増えれば ADR-024 が指摘したリスクはそのまま顕在化する。観測値自体も一時引き上げ
+  （+50%、2026-09-13 まで）で下駄を履いている。
+- 主ループが高価なモデルになるため、**規範のみで守られている区間のコスト影響が増える** — 特に
+  MCP 経由のツール実行は hook が発火しない。第5項の Sonnet 固定が破られても機械的には検知されない。
+- 5条件の意味を「Opus では足りない条件」から「Fable への一次スクリーン」へ再定義したため、
+  ADR-024 を読んだ記憶のまま作業すると解釈がずれる。`rules/role-separation.md` 側の明文化に依存する。
+
+## 関連
+
+- [ADR-024](./024-sonnet-default-main-loop.md) — 本 ADR が既定の向きを反転する対象（本文は不変、注記のみ追記）
+- [ADR-026](./026-execution-guard-role-axis.md) — 判定軸をモデルから役割へ。主ループを実行不能にした変更であり、
+  本 ADR の構造的根拠
+- [ADR-016](./016-opus-execution-guard.md) / [ADR-020](./020-thinking-tier-execution-guard.md) — ガードの原型と思考ティアへの拡張（歴史）
+- [ADR-028](./028-command-string-guard-limits.md) — ガードは効果ではなくコマンド文字列を判定する。規範が一次防御
+- [ADR-014](./014-loop-engineering-as-discipline.md) — 物理層スコープを過大に主張しない原則（第5項の根拠）
+- [ADR-006](./006-hook-error-policy.md) — fail-open（維持）
+- `rules/role-separation.md` — 既定の反転・5条件の再スコープ・Tool operations の決定を明文化
+- `rules/claude-efficiency.md` — モデル選択の既定ラベルとエフォート方針の文言を追従
+- `rules/safety-irreversible.md` — maker≠checker（既存原則を参照のみ、本 ADR で新設しない）
+- `hooks/main-loop-execution-guard.py` — **変更不要**（判定は `agent_id` の有無のみ）
+- クォータ確認の一次情報（いずれも 2026-09-09 確認）:
+  [What is the Team plan?](https://support.claude.com/en/articles/9266767-what-is-the-team-plan) /
+  [Claude Fable models on your plan](https://support.claude.com/en/articles/15424964-claude-fable-models-on-your-plan) /
+  [Usage limit best practices](https://support.claude.com/en/articles/9797557-usage-limit-best-practices)
+- 反映手順: `rules/` は copy インストールなので、マージ後に対象マシンで `python3 install.py update` の
+  再実行が必要（[ADR-023](./023-three-foundation-split.md)）
