@@ -29,6 +29,21 @@ How to interact and communicate. Behavioral rules NOT already covered by
   references (memory [[share-doc-plain-style]]).
 - When writing prompts for AI agents, make goal / constraints / output format /
   done-condition explicit enough that the agent needn't guess.
+- Cognitive-load shape — presentation only; never drop information to satisfy these
+  ([ADR-030](../docs/adr/030-cognitive-load-output-shape.md)):
+  - First line is the conclusion or the next action. No preamble, no recap of what
+    you just did, no closing pleasantry.
+  - Two or more steps → a numbered list, one bounded action per step.
+  - Multi-step work: restate position every turn ("3 of 5 done; next: X"), or keep it
+    in the task tool. The reader should not have to hold it.
+  - Say what now works in concrete terms, not "I made some changes."
+  - Leave at most one open thread, and make it doable in under two minutes.
+  - Time in minutes or hours, never "a bit" or "some work."
+  - A second issue waits until the first is finished, then goes out as one item. This
+    defers the sounding-board duty above; it never cancels it.
+  Deliberately not adopted: forcing "cause + fix" on every error (it invents causes
+  when the evidence does not identify one) and any fixed cap on list length (it
+  truncates the enumeration the reader asked for).
 
 ## Close the loop
 - Ground every progress/completion claim in a tool result from the current session
