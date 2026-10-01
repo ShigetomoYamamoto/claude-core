@@ -77,7 +77,7 @@ claude-engineering foundation 側のアーキテクチャに移動しました�
 |---|---|---|
 | `main-loop-execution-guard.py` | PreToolUse(Edit/Write/MultiEdit/NotebookEdit, Bash) | メインループ（agent_id なし）の編集・変更系 Bash 実行をモデル問わずブロック（ADR-026）。サブエージェントは通過。例外は auto-memory と scratchpad（Bash は「リダイレクトのみ・出力先が例外パス」の場合に限り通す・ADR-028） |
 | `doc-blocker.py` | PreToolUse(Write) | 許可リスト外の新規 `.md` / `.txt` 生成を阻止（既存ファイルの編集は許可） |
-| `mass-delete-blocker.py` | PreToolUse(Bash) | 再帰削除・大量削除を検知し実行前に確認（ルート/システム相当は決定的ブロック）。`python3 -c` 等インタプリタ経由の削除と `sh -c` に隠れた rm も呼び出し形式で近似検出（ADR-028） |
+| `mass-delete-blocker.py` | PreToolUse(Bash) | 再帰削除・大量削除を検知し実行前に確認（ルート/システム相当は決定的ブロック）。`find -delete` / `find -exec rm` / `xargs rm` 経由の削除（find の起点がルート/ホーム相当なら決定的ブロック、xargs rm は常に確認）、`python3 -c` 等インタプリタ経由の削除と `sh -c` に隠れた rm も呼び出し形式で近似検出（ADR-028） |
 | `git-add-secret-blocker.py` | PreToolUse(Bash) | `git add` による秘匿ファイル（.env/鍵/認証情報）のステージングをブロック |
 | `secret-detection.py` | PostToolUse(Edit/Write/MultiEdit) | ハードコードされたシークレットを検出して警告（ブロックはしない・検出層） |
 | `_command_effects.py` | —（独立の hook ではない） | `main-loop-execution-guard.py` と `mass-delete-blocker.py` が import する共有ヘルパ。「インタプリタにインラインコードを渡す呼び出し形式」（`python3 -c` / `node -e` / heredoc / `sh -c`）の判定のみを持ち、何を危険とみなすかは各 hook 側が持つ。欠けても各 hook は従来の検出のみで動作を続ける（ADR-028） |
