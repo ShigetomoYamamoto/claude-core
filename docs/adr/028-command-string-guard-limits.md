@@ -102,3 +102,13 @@ Bash を対象とする2つの hook は、いずれも**コマンド文字列の
   `cat >>`）と過少検知の不整合。
 - `rules/safety-irreversible.md` — 「ブロックを迂回しない」規範を追記した先。
 - `hooks/_command_effects.py` — 呼び出し形式を判定する共有ヘルパの実装。
+
+## 追記(2026-10-01)
+
+- 変更は2点。(1) `mass-delete-blocker.py` が `find -delete` / `find -exec|-execdir|-ok|-okdir rm` / `xargs rm` を検出対象に加えた。従来は rm トークンと再帰フラグしか見ず、`find ~ -delete` や `ls | xargs rm` が無確認で通っていた。
+- (2) `main-loop-execution-guard.py` の sed/perl `-i` 判定を同一コマンド区間内に限定した。`sed -n 1p f; grep -i foo f` のように後続コマンドの `-i` を拾う誤検知を直した。バックスラッシュ改行の継続は引き続き辿る。
+- find の方針: 起点パスが破滅的(ルート/システム/ホーム相当)なら deny、起点が全て再生成可能(SAFE_BASENAMES・scratchpad・$TMPDIR)なら ask を省略、それ以外は ask。deny は素の解析のみで、`sh -c` に隠れた形は ask 止まり。
+- xargs の方針: 対象が stdin から来て文字列では判定できないため、`xargs rm` は再帰フラグの有無を問わず常に ask。
+- パターン層は依然として意図的に不完全である。`rm $(find …)` のようなコマンド置換経由は未検出のまま。
+- 未解決: main-loop-execution-guard の `>` 比較の近似(リダイレクトと比較演算子の区別)も残っている。
+- 本追記の2変更は、この限界を縮めるものであって解消するものではない。一次防御は引き続き規範(`rules/safety-irreversible.md`)である。

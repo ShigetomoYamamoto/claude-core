@@ -34,8 +34,10 @@ EDIT_TOOLS = {"Edit", "Write", "MultiEdit", "NotebookEdit"}
 _B = r'(?:^|&&|\|\||;|\||\n)\s*'  # コマンド境界
 _MUTATING = re.compile(
     rf'{_B}(?:rm|rmdir|unlink|shred|truncate|dd|mv|cp|tee|mkdir|touch)\b'
-    rf'|{_B}sed\s+(?:\S+\s+)*-[a-zA-Z]*i[a-zA-Z]*\b'
-    rf'|{_B}perl\s+(?:\S+\s+)*-[a-zA-Z]*i[a-zA-Z]*\b'
+    # sed/perl の -i は「同じコマンド区間内」だけを探す。引数トークンは [^\s;|&]+ で区切り記号を
+    # またがせず、後続コマンド(; grep -i 等)のフラグを拾わない。バックスラッシュ改行の継続だけは辿る。
+    rf'|{_B}sed(?:(?:[ \t]|\\\n)+[^\s;|&]+)*(?:[ \t]|\\\n)+-[a-zA-Z]*i[a-zA-Z]*\b'
+    rf'|{_B}perl(?:(?:[ \t]|\\\n)+[^\s;|&]+)*(?:[ \t]|\\\n)+-[a-zA-Z]*i[a-zA-Z]*\b'
     rf'|{_B}git\s+(?:add|commit|push|reset|clean|checkout|restore|rm|mv)\b'
     rf'|{_B}(?:npm\s+(?:install|i|ci)|yarn\s+(?:add|install)|pnpm\s+(?:add|install)|pip3?\s+install)\b',
     re.MULTILINE,

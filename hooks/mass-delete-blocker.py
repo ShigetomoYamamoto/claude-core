@@ -12,6 +12,12 @@
 - 例外(緩和): 再生成可能な許可リスト(SAFE_BASENAMES / セッション scratchpad / $TMPDIR 配下)のみを
   対象とする再帰・ワイルドカード削除は ask を省略する。破滅的ターゲット判定は常に優先。
 
+find / xargs 経由の削除も検出する:
+- `find ... -delete` / `find ... -exec|-execdir|-ok|-okdir rm ...`: 起点パスが破滅的なら deny、
+  起点が全て再生成可能なら ask を省略、それ以外は ask。
+- `xargs [opts] rm ...`: 対象が stdin から来て判定できないため、-r の有無を問わず常に ask。
+- `sh -c "..."` に隠れた形は ask のみ(deny しない)。
+
 インタプリタ経由の削除(`python3 -c "os.remove(...)"`)と `sh -c` に隠れた rm も、
 呼び出し形式と既知 API の同時出現で近似検出する(#100 / ADR-028)。文字列から効果を
 確定することはできないため、この網は意図的に不完全である。
@@ -145,6 +151,58 @@ def parse_rm_segments(cmd):
     return out
 
 
+FIND_ACTIONS = ('-exec', '-execdir', '-ok', '-okdir')
+FIND_START_STOPS = ('(', '\\(', '!', ')')
+XARGS_ARG_OPTS = ('-I', '-n', '-P', '-L', '-s', '-d', '-E', '-a')
+
+
+def _is_cmd(tok, name):
+    return tok == name or tok.endswith('/' + name)
+
+
+def parse_find_calls(cmd):
+    """find による削除(-delete / -exec|-execdir|-ok|-okdir rm)ごとの起点パス一覧を返す。"""
+    out = []
+    for seg in SEP.split(cmd):
+        toks = seg.split()
+        idx = next((i for i, t in enumerate(toks) if _is_cmd(t, 'find')), None)
+        if idx is None:
+            continue
+        rest = toks[idx + 1:]
+        deletes = '-delete' in rest or any(
+            t in FIND_ACTIONS and i + 1 < len(rest) and _is_cmd(rest[i + 1], 'rm')
+            for i, t in enumerate(rest)
+        )
+        if not deletes:
+            continue
+        i = 0
+        while i < len(rest) and rest[i] in ('-H', '-L', '-P'):
+            i += 1
+        starts = []
+        while i < len(rest) and not rest[i].startswith('-') and rest[i] not in FIND_START_STOPS:
+            starts.append(rest[i])
+            i += 1
+        out.append(starts or ['.'])
+    return out
+
+
+def has_xargs_rm(cmd):
+    """xargs が rm を実行する形(オプションを読み飛ばした後のコマンドが rm)を含むか。"""
+    for seg in SEP.split(cmd):
+        toks = seg.split()
+        for idx, t in enumerate(toks):
+            if not _is_cmd(t, 'xargs'):
+                continue
+            i = idx + 1
+            while i < len(toks) and toks[i].startswith('-'):
+                i += 2 if toks[i] in XARGS_ARG_OPTS else 1
+            if i < len(toks) and _is_cmd(toks[i], 'rm'):
+                return True
+    return False
+
+
+FIND_ASK_MSG = 'find / xargs 経由の削除を検出しました(削除は取り消せません)。実行してよいか確認してください。\nコマンド: {cmd}'
+
 try:
     data = json.load(sys.stdin)
     cmd = data.get('tool_input', {}).get('command', '')
@@ -165,6 +223,12 @@ try:
         ):
             deny(f'🔴 rm -r でルート/システム/ホーム相当を削除しようとしました。\nコマンド: {cmd}')
 
+    # パス1(find): find の起点が破滅的なら即ブロック。素の解析のみ(ADR-028)。
+    find_calls = parse_find_calls(cmd)
+    for starts in find_calls:
+        if any(is_catastrophic(t) or is_catastrophic(expand_path(t, cwd)) for t in starts):
+            deny(f'🔴 find でルート/システム/ホーム相当を起点に削除しようとしました。\nコマンド: {cmd}')
+
     # パス1.5: インタプリタ経由の削除(python3 -c "import os; os.remove(...)" 等)。
     # rm 拒否ルールをブロックされた後、別経路で同じ削除が実行された事例への対応(#100)。
     # 呼び出し形式と既知の削除 API の同時出現による近似であり、未知の手段は素通りする(ADR-028)。
@@ -176,6 +240,14 @@ try:
     # 破滅的ターゲット判定(パス1 = 決定的ブロック)は誤ブロックを避けるため素の解析のみに留める(ADR-028)。
     if has_inline_shell(cmd):
         rm_calls = rm_calls + parse_rm_segments(unquote_all(cmd))
+
+    # パス1.8: find / xargs 経由の削除 → 確認(find は起点が全て再生成可能なら省略、xargs は常に確認)。
+    # sh -c に隠れた形は unquote_all の写しも見るが ask のみ(deny しない)。
+    if has_inline_shell(cmd):
+        find_calls = find_calls + parse_find_calls(unquote_all(cmd))
+    xargs_rm = has_xargs_rm(cmd) or (has_inline_shell(cmd) and has_xargs_rm(unquote_all(cmd)))
+    if xargs_rm or any(not all(is_safe_target(t, cwd) for t in starts) for starts in find_calls):
+        ask(FIND_ASK_MSG.format(cmd=cmd))
 
     # パス2: それ以外の再帰削除 → 実行前に確認(全ターゲットが再生成可能なら確認不要)
     for flags, targets in rm_calls:

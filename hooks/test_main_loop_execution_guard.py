@@ -344,6 +344,81 @@ class OpusExecutionGuardTest(unittest.TestCase):
         cmd = 'ls; rm -rf build'
         self.assertEqual(run_hook("Bash", {"command": cmd}, t), 2)
 
+    # --- ケース48: sed/perl -i の判定(ブロックされるべき) ---
+    def test_48_main_bash_sed_i_blocked(self):
+        t = self.make_transcript([opus_assistant("claude-opus-4-8")])
+        self.assertEqual(run_hook("Bash", {"command": "sed -i 's/a/b/' f"}, t), 2)
+
+    # --- ケース49: sed/perl -i の判定(ブロックされるべき) ---
+    def test_49_main_bash_sed_i_bak_blocked(self):
+        t = self.make_transcript([opus_assistant("claude-opus-4-8")])
+        self.assertEqual(run_hook("Bash", {"command": "sed -i.bak 's/a/b/' f"}, t), 2)
+
+    # --- ケース50: sed/perl -i の判定(ブロックされるべき) ---
+    def test_50_main_bash_sed_e_then_i_blocked(self):
+        t = self.make_transcript([opus_assistant("claude-opus-4-8")])
+        self.assertEqual(run_hook("Bash", {"command": "sed -e 's/x/y/' -i f"}, t), 2)
+
+    # --- ケース51: sed/perl -i の判定(ブロックされるべき) ---
+    def test_51_main_bash_sed_Ei_after_and_blocked(self):
+        t = self.make_transcript([opus_assistant("claude-opus-4-8")])
+        self.assertEqual(run_hook("Bash", {"command": "cd x && sed -Ei 's/a/b/' f"}, t), 2)
+
+    # --- ケース52: sed/perl -i の判定(ブロックされるべき) ---
+    def test_52_main_bash_perl_pi_blocked(self):
+        t = self.make_transcript([opus_assistant("claude-opus-4-8")])
+        self.assertEqual(run_hook("Bash", {"command": "perl -pi -e 's/a/b/' f"}, t), 2)
+
+    # --- ケース53: sed/perl -i の判定(ブロックされるべき) ---
+    def test_53_main_bash_perl_i_pe_blocked(self):
+        t = self.make_transcript([opus_assistant("claude-opus-4-8")])
+        self.assertEqual(run_hook("Bash", {"command": "perl -i -pe 's/a/b/' f"}, t), 2)
+
+    # --- ケース54: sed/perl -i の判定(ブロックされるべき) ---
+    def test_54_main_bash_sed_backslash_newline_i_blocked(self):
+        t = self.make_transcript([opus_assistant("claude-opus-4-8")])
+        self.assertEqual(run_hook("Bash", {"command": "sed \\\n-i 's/a/b/' f"}, t), 2)
+
+    # --- ケース55: sed/perl -i の判定(ブロックされるべき) ---
+    def test_55_main_bash_sed_n_then_rm_blocked(self):
+        t = self.make_transcript([opus_assistant("claude-opus-4-8")])
+        self.assertEqual(run_hook("Bash", {"command": 'sed -n 1p f; rm -rf build'}, t), 2)
+
+    # --- ケース56: sed/perl -i の判定(ブロックされるべき) ---
+    def test_56_main_bash_sed_n_redirect_blocked(self):
+        t = self.make_transcript([opus_assistant("claude-opus-4-8")])
+        self.assertEqual(run_hook("Bash", {"command": 'sed -n 1p f > out.txt'}, t), 2)
+
+    # --- ケース57: 後続コマンドの -i を sed/perl の -i と誤認しない(通過すべき) ---
+    def test_57_main_bash_sed_n_semicolon_grep_i_allowed(self):
+        t = self.make_transcript([opus_assistant("claude-opus-4-8")])
+        self.assertEqual(run_hook("Bash", {"command": "sed -n '1,20p' f; grep -n -i foo f"}, t), 0)
+
+    # --- ケース58: 後続コマンドの -i を sed/perl の -i と誤認しない(通過すべき) ---
+    def test_58_main_bash_sed_n_and_grep_rin_allowed(self):
+        t = self.make_transcript([opus_assistant("claude-opus-4-8")])
+        self.assertEqual(run_hook("Bash", {"command": "sed -n '1,20p' f && grep -rin foo ."}, t), 0)
+
+    # --- ケース59: 後続コマンドの -i を sed/perl の -i と誤認しない(通過すべき) ---
+    def test_59_main_bash_sed_n_newline_grep_i_allowed(self):
+        t = self.make_transcript([opus_assistant("claude-opus-4-8")])
+        self.assertEqual(run_hook("Bash", {"command": "sed -n '1,20p' f\ngrep -i foo f"}, t), 0)
+
+    # --- ケース60: 後続コマンドの -i を sed/perl の -i と誤認しない(通過すべき) ---
+    def test_60_main_bash_sed_n_pipe_grep_i_allowed(self):
+        t = self.make_transcript([opus_assistant("claude-opus-4-8")])
+        self.assertEqual(run_hook("Bash", {"command": 'sed -n 5p f | grep -i x'}, t), 0)
+
+    # --- ケース61: 後続コマンドの -i を sed/perl の -i と誤認しない(通過すべき) ---
+    def test_61_main_bash_git_log_sed_n_ls_i_allowed(self):
+        t = self.make_transcript([opus_assistant("claude-opus-4-8")])
+        self.assertEqual(run_hook("Bash", {"command": 'git log --oneline; sed -n 1p f; ls -i'}, t), 0)
+
+    # --- ケース62: 後続コマンドの -i を sed/perl の -i と誤認しない(通過すべき) ---
+    def test_62_main_bash_perl_ne_semicolon_grep_i_allowed(self):
+        t = self.make_transcript([opus_assistant("claude-opus-4-8")])
+        self.assertEqual(run_hook("Bash", {"command": "perl -ne 'print' f; grep -i x f"}, t), 0)
+
 
 class CommandEffectsGuardTest(unittest.TestCase):
     """_command_effects.py 由来の検出(ADR-028)の契約テスト。

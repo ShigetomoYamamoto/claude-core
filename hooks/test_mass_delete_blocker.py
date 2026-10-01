@@ -292,6 +292,103 @@ class ExpandedHomePathMassDeleteTest(unittest.TestCase):
         self.assertEqual(proc.stdout, "")
 
 
+class FindXargsMassDeleteTest(unittest.TestCase):
+    """find / xargs 経由の削除の検出(find -delete / -exec rm / xargs rm)の契約テスト。
+
+    - find の起点が破滅的(/ , ~ , $HOME , 展開済みホーム)なら deny(パス1と同様、素の解析のみ)。
+    - 起点が全て再生成可能なら ask を省略、それ以外は ask。
+    - xargs rm は対象が stdin で判定できないため常に ask。
+    - sh -c に隠れた形は ask のみ(deny しない)。
+    """
+
+    HOME = os.path.realpath(os.path.expanduser("~"))
+    SCRATCH = "/private/tmp/claude-x/y/scratchpad"
+
+    def assert_ask(self, command, cwd=DEFAULT_CWD):
+        proc = run_hook_full(command, cwd)
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        out = json.loads(proc.stdout)
+        self.assertEqual(out["hookSpecificOutput"]["permissionDecision"], "ask")
+
+    def assert_deny(self, command, cwd=DEFAULT_CWD):
+        proc = run_hook_full(command, cwd)
+        self.assertEqual(proc.returncode, 2, proc.stdout)
+
+    def assert_silent(self, command, cwd=DEFAULT_CWD):
+        proc = run_hook_full(command, cwd)
+        self.assertEqual(proc.returncode, 0)
+        self.assertEqual(proc.stdout, "")
+
+    # --- deny ---
+    def test_f01_find_home_delete_denied(self):
+        self.assert_deny("find ~ -delete")
+
+    def test_f02_find_root_name_delete_denied(self):
+        self.assert_deny("find / -name '*.bak' -delete")
+
+    def test_f03_find_home_env_exec_rm_denied(self):
+        self.assert_deny("find $HOME -type f -exec rm {} +")
+
+    def test_f04_find_expanded_home_delete_denied(self):
+        self.assert_deny(f"find {os.path.expanduser('~')} -delete")
+
+    def test_f05_find_home_exec_rm_rf_denied(self):
+        self.assert_deny("find ~ -exec rm -rf {} +")
+
+    # --- ask ---
+    def test_f10_find_dot_type_f_delete_asks(self):
+        self.assert_ask("find . -type f -delete")
+
+    def test_f11_find_src_delete_asks(self):
+        self.assert_ask("find src -name '*.log' -delete")
+
+    def test_f12_find_exec_rm_plus_asks(self):
+        self.assert_ask("find . -name '*.log' -exec rm {} +")
+
+    def test_f13_find_exec_rm_semicolon_asks(self):
+        self.assert_ask("find . -exec rm {} \\;")
+
+    def test_f14_ls_xargs_rm_asks(self):
+        self.assert_ask("ls | xargs rm")
+
+    def test_f15_find_home_pipe_xargs_rm_asks(self):
+        self.assert_ask("find ~ -type f | xargs rm")
+
+    def test_f16_xargs_0_rm_asks(self):
+        self.assert_ask("xargs -0 rm")
+
+    def test_f17_xargs_I_rm_asks(self):
+        self.assert_ask("xargs -I {} rm {}")
+
+    def test_f18_xargs_n_1_rm_f_asks(self):
+        self.assert_ask("xargs -n 1 rm -f")
+
+    def test_f19_sh_c_find_delete_asks(self):
+        self.assert_ask('sh -c "find . -delete"')
+
+    def test_f20_find_home_downloads_delete_asks(self):
+        self.assert_ask("find ~/Downloads -delete")
+
+    # --- 無反応 ---
+    def test_f30_find_without_delete_passthrough(self):
+        self.assert_silent("find . -name '*.log'")
+
+    def test_f31_find_node_modules_delete_silent(self):
+        self.assert_silent("find node_modules -delete")
+
+    def test_f32_find_dot_delete_in_scratchpad_silent(self):
+        self.assert_silent("find . -delete", cwd=self.SCRATCH)
+
+    def test_f33_xargs_grep_passthrough(self):
+        self.assert_silent("ls | xargs grep foo")
+
+    def test_f34_xargs_cp_passthrough(self):
+        self.assert_silent("xargs -I {} cp {} dst")
+
+    def test_f35_git_log_passthrough(self):
+        self.assert_silent("git log --oneline")
+
+
 class CommandEffectsModuleMissingMassDeleteTest(unittest.TestCase):
     """_command_effects.py が import できない環境でも、mass-delete-blocker は
     従来どおりの rm トークン解析だけで動き続けることを確認する(ADR-028)。
