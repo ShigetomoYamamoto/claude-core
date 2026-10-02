@@ -40,7 +40,7 @@ engineering / work-agent はこの土台の上に、それぞれのドメイン�
 |---|---|---|
 | `main-loop-execution-guard.py` | PreToolUse(Edit系/Bash) | メインループ（agent_id なし）の編集・変更系 Bash をモデル問わずブロック。例外は auto-memory と scratchpad（Bash はリダイレクト先のみ救済・ADR-028） |
 | `doc-blocker.py` | PreToolUse(Write) | 許可外の新規 .md/.txt 生成を阻止 |
-| `mass-delete-blocker.py` | PreToolUse(Bash) | 再帰/大量削除を確認、ルート/システムは決定的ブロック。`find -delete` / `find -exec rm` / `xargs rm` 経由の削除も確認（find の起点がルート/ホーム相当なら決定的ブロック）。インタプリタ経由の削除も近似検出（ADR-028） |
+| `mass-delete-blocker.py` | PreToolUse(Bash) | 再帰/大量削除を確認、ルート/システムは決定的ブロック。`find -delete` / `find -exec rm` / `xargs rm` 経由の削除も確認（find の起点がルート/ホーム相当なら決定的ブロック）。`unlink` / `rmdir` / `shred` / `rsync --delete` 経由の削除（find -exec / xargs 経由を含む）も確認（rsync は宛先がルート/ホーム相当なら決定的ブロック、dry-run は対象外）。インタプリタ経由の削除も近似検出（ADR-028） |
 | `git-add-secret-blocker.py` | PreToolUse(Bash) | 秘匿ファイルの `git add` をブロック |
 | `secret-detection.py` | PostToolUse(Edit系) | ハードコード秘密を検出して警告（非ブロック） |
 
