@@ -112,3 +112,11 @@ Bash を対象とする2つの hook は、いずれも**コマンド文字列の
 - パターン層は依然として意図的に不完全である。`rm $(find …)` のようなコマンド置換経由は未検出のまま。
 - 未解決: main-loop-execution-guard の `>` 比較の近似(リダイレクトと比較演算子の区別)も残っている。
 - 本追記の2変更は、この限界を縮めるものであって解消するものではない。一次防御は引き続き規範(`rules/safety-irreversible.md`)である。
+
+## 追記(2026-10-02)
+
+- `mass-delete-blocker.py` に `unlink` / `rmdir` / `shred` / `rsync --delete`(`--del` / `--delete-*` を含む)を検出対象として加えた(#109)。いずれも rm トークンを使わずに同じ削除を行う経路で、hook と各プロジェクトの `Bash(rm *)` deny の両方を素通りしていた。
+- 方針 — unlink / rmdir は ask(対象が全て再生成可能なら省略。rmdir は空ディレクトリしか消せないが、トークン置換の経路として揃えた)。shred は常に ask(-u が無くても中身を破壊する)。rsync は delete 系オプションがあるときだけ対象で、宛先が破滅的なら deny、再生成可能なら通過、それ以外は ask。dry-run(-n / --dry-run)は対象外。リモート宛先は判定できないため ask(パスが破滅的なら deny)。
+- `_command_effects.DELETE_APIS` の `unlink` を括弧なしの呼び出しにも当てるよう `\bunlink\b` に変更した。従来は `\bunlink\s*\(` で、Perl の `unlink 'a'` / `unlink @files` を落としていた。
+- `find -exec|-execdir|-ok|-okdir` と `xargs` も `rm` に加えて `unlink` / `rmdir` / `shred` を実行する形を対象にした(find は起点で deny / 通過 / ask、xargs は常に ask)。`for` / `if` / `do` / `(` などシェル構文の直後もコマンド位置として扱う。unlink / rmdir の「祖先が許可リスト」の緩和は cwd 配下のパスにだけ効かせる。rsync は `--exclude X` や `-e ssh` のように値を別トークンで取るオプションの値を読み飛ばして宛先を決める。
+- 上書き系(`>` / `truncate` / `dd of=` / 既存ファイルへの `cp`・`mv` など)は引き続き未対応で、#109 の残件である。
