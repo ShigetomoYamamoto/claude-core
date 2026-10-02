@@ -389,6 +389,170 @@ class FindXargsMassDeleteTest(unittest.TestCase):
         self.assert_silent("git log --oneline")
 
 
+class UnlinkShredRsyncMassDeleteTest(unittest.TestCase):
+    """unlink / rmdir / shred / rsync --delete / Perl 括弧なし unlink の検出の契約テスト(#109)。
+
+    - unlink / rmdir: ask。対象が全て再生成可能なら省略。shred: 常に ask。
+    - rsync: delete 系オプションがあるときだけ対象。宛先が破滅的なら deny、再生成可能なら通過、
+      それ以外は ask。dry-run は対象外。リモート宛先は ask(パスが破滅的なら deny)。
+    - sh -c に隠れた形は ask のみ(deny しない)。
+    """
+
+    HOME = os.path.realpath(os.path.expanduser("~"))
+
+    def assert_ask(self, command, cwd=DEFAULT_CWD):
+        proc = run_hook_full(command, cwd)
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        out = json.loads(proc.stdout)
+        self.assertEqual(out["hookSpecificOutput"]["permissionDecision"], "ask")
+
+    def assert_deny(self, command, cwd=DEFAULT_CWD):
+        proc = run_hook_full(command, cwd)
+        self.assertEqual(proc.returncode, 2, proc.stdout)
+
+    def assert_silent(self, command, cwd=DEFAULT_CWD):
+        proc = run_hook_full(command, cwd)
+        self.assertEqual(proc.returncode, 0)
+        self.assertEqual(proc.stdout, "")
+
+    # --- unlink / rmdir / shred ---
+    def test_u01_unlink_asks(self):
+        self.assert_ask("unlink notes.txt")
+
+    def test_u02_rmdir_asks(self):
+        self.assert_ask("rmdir src/old")
+
+    def test_u03_unlink_safe_target_silent(self):
+        self.assert_silent("unlink dist/x.js")
+
+    def test_u04_rmdir_safe_target_silent(self):
+        self.assert_silent("rmdir node_modules/.cache")
+
+    def test_u05_shred_u_asks(self):
+        self.assert_ask("shred -u secret.txt")
+
+    def test_u06_shred_plain_asks(self):
+        self.assert_ask("shred file")
+
+    def test_u07_shred_safe_target_still_asks(self):
+        self.assert_ask("shred -u dist/a")
+
+    # --- rsync --delete: deny ---
+    def test_u10_rsync_delete_home_tilde_denied(self):
+        self.assert_deny("rsync -a --delete src/ ~/")
+
+    def test_u11_rsync_delete_expanded_home_denied(self):
+        self.assert_deny(f"rsync -a --delete src/ {self.HOME}/")
+
+    def test_u12_rsync_delete_root_denied(self):
+        self.assert_deny("rsync -a --delete empty/ /")
+
+    def test_u13_rsync_delete_remote_root_denied(self):
+        self.assert_deny("rsync -a --delete src/ server:/")
+
+    # --- rsync --delete: ask ---
+    def test_u20_rsync_delete_local_asks(self):
+        self.assert_ask("rsync -a --delete src/ backup/")
+
+    def test_u21_rsync_delete_after_asks(self):
+        self.assert_ask("rsync -av --delete-after src/ backup/")
+
+    def test_u22_rsync_del_asks(self):
+        self.assert_ask("rsync -a --del src/ backup/")
+
+    def test_u23_rsync_delete_remote_asks(self):
+        self.assert_ask("rsync -a --delete src/ server:/srv/app")
+
+    # --- rsync: 通過 ---
+    def test_u30_rsync_delete_short_dry_run_silent(self):
+        self.assert_silent("rsync -avn --delete src/ backup/")
+
+    def test_u31_rsync_delete_long_dry_run_silent(self):
+        self.assert_silent("rsync -a --dry-run --delete src/ backup/")
+
+    def test_u32_rsync_delete_safe_dest_silent(self):
+        self.assert_silent("rsync -a --delete src/ node_modules/")
+
+    def test_u33_rsync_without_delete_silent(self):
+        self.assert_silent("rsync -a src/ backup/")
+
+    # --- Perl 括弧なし unlink ---
+    def test_u40_perl_unlink_string_asks(self):
+        self.assert_ask("perl -e \"unlink 'a'\"")
+
+    def test_u41_perl_unlink_array_asks(self):
+        self.assert_ask("perl -e 'unlink @files'")
+
+    def test_u42_grep_unlink_silent(self):
+        self.assert_silent("grep -rn unlink src/")
+
+    # --- sh -c に隠れた形(ask のみ) ---
+    def test_u50_sh_c_shred_asks(self):
+        self.assert_ask('sh -c "shred -u x"')
+
+    def test_u51_sh_c_rsync_delete_home_asks_not_denied(self):
+        self.assert_ask('sh -c "rsync -a --delete a/ ~/"')
+
+    # --- 素通りの確認 ---
+    def test_u60_echo_unlink_silent(self):
+        self.assert_silent("echo unlink")
+
+    def test_u61_ls_rsync_notes_silent(self):
+        self.assert_silent("ls rsync-notes/")
+
+    # --- シェル構文の直後(コマンド位置) ---
+    def test_u70_for_loop_unlink_asks(self):
+        self.assert_ask('for f in *; do unlink "$f"; done')
+
+    def test_u71_if_then_shred_asks(self):
+        self.assert_ask("if [ -f a ]; then shred -u a; fi")
+
+    def test_u72_subshell_unlink_asks(self):
+        self.assert_ask("(unlink a)")
+
+    def test_u73_grep_shred_silent(self):
+        self.assert_silent("grep -rn shred src/")
+
+    # --- find -exec / xargs が unlink / rmdir / shred を実行 ---
+    def test_u80_find_exec_unlink_asks(self):
+        self.assert_ask("find . -exec unlink {} \\;")
+
+    def test_u81_find_home_exec_shred_denied(self):
+        self.assert_deny("find ~ -exec shred -u {} +")
+
+    def test_u82_find_safe_exec_unlink_silent(self):
+        self.assert_silent("find node_modules -exec unlink {} \\;")
+
+    def test_u83_xargs_unlink_asks(self):
+        self.assert_ask("ls | xargs unlink")
+
+    def test_u84_xargs_shred_asks(self):
+        self.assert_ask("xargs shred -u < list")
+
+    # --- unlink の祖先ルールは cwd 配下のみ ---
+    def test_u90_unlink_under_safe_dir_in_cwd_silent(self):
+        self.assert_silent("unlink dist/x.js", cwd=DEFAULT_CWD)
+
+    def test_u91_unlink_parent_relative_asks(self):
+        self.assert_ask("unlink ../dist/x.js", cwd=DEFAULT_CWD)
+
+    def test_u92_unlink_outside_cwd_with_safe_ancestor_asks(self):
+        self.assert_ask(f"unlink {self.HOME}/work-out-test/out/proj/src/a.py", cwd=DEFAULT_CWD)
+
+    # --- rsync: オプション値は宛先ではない ---
+    def test_u100_rsync_exclude_value_not_dest_asks(self):
+        self.assert_ask("rsync -a --delete src/ backup/ --exclude node_modules")
+
+    def test_u101_rsync_exclude_value_home_dest_denied(self):
+        self.assert_deny("rsync -a --delete src/ ~/ --exclude node_modules")
+
+    def test_u102_rsync_e_ssh_home_dest_denied(self):
+        self.assert_deny("rsync -a --delete -e ssh src/ ~/")
+
+    def test_u103_rsync_exclude_eq_safe_dest_silent(self):
+        self.assert_silent("rsync -a --delete --exclude=node_modules src/ node_modules/")
+
+
 class CommandEffectsModuleMissingMassDeleteTest(unittest.TestCase):
     """_command_effects.py が import できない環境でも、mass-delete-blocker は
     従来どおりの rm トークン解析だけで動き続けることを確認する(ADR-028)。

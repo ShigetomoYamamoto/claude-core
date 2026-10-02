@@ -26,7 +26,7 @@ _INLINE_SHELL = re.compile(rf'\b{_SHELL}\b[^\n;|&]*?\s-[a-z]*c\b')
 DELETE_APIS = re.compile(
     r'\bos\.(?:remove|unlink|rmdir|removedirs)\s*\('
     r'|\bshutil\.rmtree\s*\('
-    r'|\bunlink\s*\('
+    r'|\bunlink\b'
     r'|\bfs\.(?:rm|rmSync|rmdir|rmdirSync|unlink|unlinkSync)\s*\('
     r'|\bFileUtils\.(?:rm|rm_r|rm_rf)\b'
     r'|\bFile\.delete\b'
