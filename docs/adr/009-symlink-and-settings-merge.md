@@ -58,3 +58,5 @@ ADR-004 が当時 symlink を退けた理由は「`__HOME__` 置換ができな�
 - 実装: `install.py`・`setup.sh`（ラッパー）・`settings.json.template`
 - アーキテクチャ: `docs/architecture.md` Layer 5: Installer
 - 要件定義: `docs/requirements.md` セクション「E. マルチマシン同期」
+
+> 追記 (2026-10-02): hooks.PreToolUse / PostToolUse の FORCE は、[ADR-031](./031-hook-merge-by-ownership.md) で「配列丸ごとの置き換え」から「この pack が所有する hook だけの入れ替え」に変更した。
