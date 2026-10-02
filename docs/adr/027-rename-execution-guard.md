@@ -51,3 +51,5 @@
 - [ADR-025](./025-single-entry-and-loop-engineering-skill-retirement.md) — 名前が実態を僭称する問題の先例。
 - [ADR-022](./022-autorun-flow-out-of-always-loaded-rules.md) — 既存 ADR 本文の旧パス表記を残す運用。
 - `rules/role-separation.md` — 現行の名前と役割分担の正本。
+
+> 追記 (2026-10-02): 旧パスの除去は、[ADR-031](./031-hook-merge-by-ownership.md) 以降は前回の manifest に基づく所有判定で行う（配列丸ごとの置き換えは廃止）。
