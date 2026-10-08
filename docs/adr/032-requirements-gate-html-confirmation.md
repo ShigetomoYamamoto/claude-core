@@ -1,6 +1,6 @@
 # ADR-032: /autorun の requirements ゲートに HTML の確認画面を足し、回答をローカルの受け口で自動返送する
 
-**ステータス**: proposed
+**ステータス**: accepted（一部を [ADR-033](./033-review-html-generalization.md) が置き換え。2026-10-08）
 
 **日付**: 2026-10-08
 
