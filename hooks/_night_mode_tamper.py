@@ -4,6 +4,8 @@
 実行する手口、スクリプトファイルの中身は見ない。
 """
 import fnmatch
+import os
+import posixpath
 import re
 import shlex
 
@@ -18,7 +20,7 @@ _INPLACE_FLAG = re.compile(r"-[a-zA-Z]*i|--in-place")
 _NOISE_REDIRECT = re.compile(r"\d*>>?\s*/dev/null|&>\s*/dev/null|\d*>&\d+-?")
 _GLOB_CHARS = re.compile(r"[*?\[]")
 # .git/config・.git/hooks/*・.git/info/*(worktree 側の gitdir も)。ここに書くと git が任意コマンドを走らせうる。
-_GIT_INTERNAL = re.compile(r"\.git/(?:worktrees/[^/\s]+/)?(?:config|hooks|info)(?![\w-])")
+_GIT_INTERNAL = re.compile(r"\.git/(?:(?:worktrees|modules)/[^/\s]+/)*(?:config|hooks|info)(?![\w-])")
 
 
 def _squeeze(cmd):
@@ -88,10 +90,33 @@ def _glob_hits_claude_or_marker(squeezed):
     return hits_dir, hits_marker
 
 
-def check_tamper(cmd, segments):
+def _neutralize_worktrees(text, home):
+    """`.claude/worktrees/` はプロジェクトの作業ツリー置き場なので、.claude の言及に数えない。
+
+    ただしホームの .claude(`~/`・`$HOME/`・`${HOME}/`・ホームの絶対パス)の下は数える。
+    """
+    pat = re.compile(r"((?:~|\$\{?home\}?|%s)/)?\.claude/worktrees/" % re.escape(home.casefold()))
+    return pat.sub(lambda m: m.group(0) if m.group(1) else ".wt/", text)
+
+
+def cwd_in_claude(cwd, home):
+    """作業ディレクトリが、ホームの .claude の中、または .claude/worktrees/* 以外の .claude の中か。"""
+    if not cwd:
+        return False
+    c = posixpath.normpath(str(cwd)).casefold()
+    hc = posixpath.normpath(posixpath.join(home, ".claude")).casefold()
+    if c == hc or c.startswith(hc + "/"):
+        return True
+    comps = c.split("/")
+    return any(comp == ".claude" and (i + 1 >= len(comps) or comps[i + 1] != "worktrees")
+               for i, comp in enumerate(comps))
+
+
+def check_tamper(cmd, segments, cwd=None, home=None):
     """止めるべきなら理由を、通してよければ None を返す。segments は区切り済みのコマンド列。"""
-    cmd = cmd.casefold()  # macOS の既定のファイルシステムは大文字小文字を区別しない
-    squeezed = _squeeze(cmd)
+    home = home or os.path.expanduser("~")
+    cmd = _neutralize_worktrees(cmd.casefold(), home)  # macOS の既定のファイルシステムは大文字小文字を区別しない
+    squeezed = _neutralize_worktrees(_squeeze(cmd), home)
     for text in (cmd, squeezed):
         if _NIGHT.search(text):
             return "夜間モードのマーカーや開始・終了コマンドに触れる語(night-mode)"
@@ -101,7 +126,8 @@ def check_tamper(cmd, segments):
             if key in text:
                 return f"夜間モードの設定や安全装置に触れるコマンド({key})"
     hits_dir, hits_marker = _glob_hits_claude_or_marker(squeezed)
-    mentions = ".claude" in cmd or ".claude" in squeezed or hits_dir or bool(_GIT_INTERNAL.search(squeezed))
+    mentions = (".claude" in cmd or ".claude" in squeezed or hits_dir or bool(_GIT_INTERNAL.search(squeezed))
+                or cwd_in_claude(cwd, home))
     if not mentions:
         return None
     if hits_marker:

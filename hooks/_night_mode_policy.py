@@ -10,9 +10,11 @@ from datetime import datetime
 from _night_mode_bash import check_bash
 
 _FILE_TOOLS = {"Edit", "Write", "MultiEdit", "NotebookEdit"}
-_LOCAL_SERVERS = ("unityMCP", "ccd_session_mgmt", "ccd_turn", "ccd_view", "ccd_sidebar", "ccd_window",
-                  "ccd_host", "ccd_directory", "ccd_connectors", "ccd_settings", "visualize",
-                  "Claude_Code_iOS_Simulator", "scheduled-tasks")
+# サーバ名はぴったり一致で見る(前方一致にすると、似た名前の外部サーバが通ってしまう)。
+_LOCAL_SERVERS = {"ccd_session_mgmt", "ccd_turn", "ccd_view", "ccd_sidebar", "ccd_window", "ccd_host",
+                  "ccd_directory", "ccd_connectors", "ccd_settings", "visualize",
+                  "Claude_Code_iOS_Simulator", "scheduled-tasks"}
+_UNITY_SERVER = re.compile(r"unityMCP(?:-[\w.]+)?")
 _SERVICE_PREFIXES = {"slack", "notion", "api", "gmail", "calendar", "drive", "browser"}
 _READ_VERBS = {"get", "list", "read", "search", "fetch", "query", "view", "find", "retrieve",
                "download", "whoami", "describe"}
@@ -58,7 +60,7 @@ def check_file(path, marker, home, cwd=None):
     if real.casefold() == os.path.realpath(marker).casefold():
         return "夜間モードのマーカーファイルの編集"
     for cand in (os.path.normpath(p).casefold(), real.casefold()):
-        if re.search(r"/\.git/(?:worktrees/[^/]+/)?(?:config(?:\.worktree)?$|hooks/|info/)", cand):
+        if re.search(r"/\.git/(?:(?:worktrees|modules)/[^/]+/)*(?:config(?:\.worktree)?$|hooks/|info/)", cand):
             return ".git/config・hooks・info の編集(git に任意のコマンドを走らせうるため)"
         if re.search(r"/\.claude/settings[^/]*\.json$", cand):
             return "Claude Code の設定ファイル(.claude/settings*.json)の編集"
@@ -89,7 +91,7 @@ def check_mcp(tool_name, tool_input):
         return None
     if server == "ccd_pr":
         return f"PR の自動マージ設定({tool_name})" if base == "set_auto_merge" else None
-    if server.startswith(_LOCAL_SERVERS):
+    if server in _LOCAL_SERVERS or _UNITY_SERVER.fullmatch(server):
         return None
     if _is_read_name(base):
         return None
@@ -100,7 +102,7 @@ def check_tool(tool_name, tool_input, marker, home, cwd=None):
     """夜間モード ON のとき、この呼び出しを止める理由(止めなければ None)。"""
     tool_input = tool_input if isinstance(tool_input, dict) else {}
     if tool_name == "Bash":
-        return check_bash(str(tool_input.get("command", "")))
+        return check_bash(str(tool_input.get("command", "")), 0, cwd, home)
     if tool_name in _FILE_TOOLS:
         path = tool_input.get("file_path") or tool_input.get("notebook_path")
         return check_file(path, marker, home, cwd)

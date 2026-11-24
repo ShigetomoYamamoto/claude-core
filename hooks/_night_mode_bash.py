@@ -2,43 +2,41 @@
 
 コマンド文字列を、クォートを考慮して区切り、各コマンドの先頭語を見る。
 `g"it" push` / `\\git push` / `git -C x push` / `sh -c '...'` / `sudo git push` も同じ形に直して判定する。
+最後に、先頭のプログラムに関係なく「git の後ろに push」などの語があれば止める網を張る(止めすぎは承知)。
 これは検出網であり境界ではない(ADR-028)。curl での POST・スクリプトファイルの中身・
-インタプリタ内の subprocess などは見ない(ADR-036 の限界)。
+インタプリタ内の subprocess などは、この網にかからない形なら見ない(ADR-036 の限界)。
 """
+import os
+import posixpath
 import re
 import shlex
 
+from _night_mode_git import check_gh, check_git
 from _night_mode_tamper import check_tamper
 
-_GIT_LIKE = {"git", "gh", "git-send-email", "sh", "bash", "zsh", "dash", "ksh", "eval"}
-_SHELLS = {"sh", "bash", "zsh", "dash", "ksh"}
-_WRAPPERS = {"command", "builtin", "sudo", "env", "time", "nohup", "exec", "nice", "xargs",
-             "then", "do", "else", "if", "while", "until", "!", "timeout", "stdbuf"}
-_GIT_VALUE_OPTS = {"-C", "--git-dir", "--work-tree", "--namespace", "--exec-path"}
-_GIT_CONFIG_OPTS = {"-c", "--config-env"}
-# 夜間モード中に通す git のサブコマンド(ローカル・読み取り中心)。これ以外(push・send-email・別名・未知)は止める。
-_GIT_ALLOWED = {"add", "commit", "status", "log", "diff", "show", "branch", "checkout", "switch", "restore",
-                "reset", "rev-parse", "worktree", "merge", "rebase", "cherry-pick", "tag", "fetch", "pull",
-                "ls-files", "grep", "blame", "init", "clone", "describe", "shortlog", "reflog", "stash",
-                "config"}
-_GIT_CONFIG_READ = {"--get", "--get-all", "--list", "-l"}
-_GIT_ENV = re.compile(r"(?<![\w])(?:GIT_\w*|EDITOR|VISUAL|SSH_ASKPASS)=")
-_GIT_TOKEN = re.compile(r"(?<![\w])(?:git|gh)(?![\w])")
+_SHELLS = {"sh", "bash", "zsh", "dash", "ksh", "fish", "csh", "tcsh"}
+_GIT_LIKE = {"git", "gh", "git-send-email", "eval"} | _SHELLS
+_WRAPPERS = {"command", "builtin", "sudo", "doas", "env", "time", "nohup", "exec", "nice", "xargs",
+             "then", "do", "else", "if", "while", "until", "!", "timeout", "stdbuf", "caffeinate",
+             "script", "arch", "watch", "flock"}
 _MAX_DEPTH = 3
-_GH_READ = {
-    "pr": {"view", "list", "status", "diff", "checks"},
-    "issue": {"view", "list", "status"},
-    "run": {"view", "list", "watch"},
-    "workflow": {"view", "list"},
-    "release": {"view", "list", "download"},
-    "repo": {"view", "clone"},
-    "auth": {"status"},
-}
-_GH_WRITE_FLAGS = {"-f", "-F", "--field", "--raw-field", "--input"}
-_INLINE_PUSH = re.compile(r"\bgit\b.*\bpush\b|\bsend-email\b|\bgh\b\W+(?:pr|issue|release|api|repo|workflow|gist)\b")
+# 環境変数での設定上書き・外部コマンドの仕込み。次の (名前, 値) だけは無害なので通す。
+_ENV_ASSIGN = re.compile(r"(?<![\w])((?:GIT_\w*|EDITOR|VISUAL|SSH_ASKPASS|PAGER))=(\S*)")
+_SAFE_ENV = {("GIT_EDITOR", "true"), ("GIT_EDITOR", ":"), ("GIT_SEQUENCE_EDITOR", "true"),
+             ("GIT_SEQUENCE_EDITOR", ":"), ("EDITOR", "true"), ("EDITOR", ":"), ("VISUAL", "true"),
+             ("VISUAL", ":"), ("GIT_PAGER", "cat"), ("PAGER", "cat"), ("GIT_TERMINAL_PROMPT", "0")}
 _FIND_EXEC = {"-exec", "-execdir", "-ok", "-okdir"}
 _REDIR_OP = re.compile(r"\d*(?:<<<|<<-?|<>|<|>>|>\|?|&>)")
 _REDIR_ATTACHED = re.compile(r"\d*(?:<<<|<<-?|<|>>|>)\S+")
+# 網: 先頭のプログラムに関係なく、語の並びだけで見る(python -c・node -e・osascript・未知のラッパーも)。
+_CATCH_GIT = re.compile(r"\bgit\b.*\b(?:push|send-email)\b", re.S)
+_CATCH_GH = re.compile(
+    r"\bgh\b.*\b(?:pr[^\w-]+(?:create|merge|review|comment|edit|close|reopen|ready)"
+    r"|issue[^\w-]+(?:create|comment|edit|close)|release[^\w-]+(?:create|edit|delete|upload)"
+    r"|repo[^\w-]+(?:create|fork|delete|edit)|workflow[^\w-]+run)\b", re.S)
+_CATCH_GH_API = re.compile(r"\bgh\b.*\bapi\b", re.S)
+_CATCH_API_WRITE = re.compile(r"(?<![\w-])(?:(?:-x|--method)[=\s]*(?:post|put|patch|delete)\b|-f|--field|--raw-field|--input)")
+_WORD_SPLIT = re.compile(r"[\s;|&()`<>=]+")
 
 
 def split_segments(cmd):
@@ -76,82 +74,57 @@ def _base(tok):
     return tok.rsplit("/", 1)[-1]
 
 
-def _base(tok):
-    return tok.rsplit("/", 1)[-1]
+def _is_git_word(word):
+    base = _base(word).casefold()
+    return base in ("git", "gh") or base.startswith("git-")
 
 
-def _git_sub(args):
-    """グローバルオプションを飛ばして (サブコマンド, 残りの引数, -c の有無) を返す。"""
-    i, config = 0, False
-    while i < len(args):
-        a = args[i]
-        if a in _GIT_CONFIG_OPTS or a.startswith("--config-env="):
-            config = True
-        if a in _GIT_VALUE_OPTS or a in _GIT_CONFIG_OPTS:
-            i += 2; continue
-        if a.startswith("-"):
-            i += 1; continue
-        return a, args[i + 1:], config
-    return None, [], config
-
-
-def _check_git(args, depth):
-    sub, rest, config = _git_sub(args)
-    if config:
-        return "git -c(設定の上書き。別名や外部コマンドの経路になるため)"
-    if sub is None:
-        return None
-    if sub not in _GIT_ALLOWED:
-        return f"git {sub}(夜間モードで通すのはローカルの git だけ)"
-    if sub == "config" and not (_GIT_CONFIG_READ & set(rest)):
-        return "git config の書き込み"
-    if sub == "rebase" and any(a.startswith(("-x", "--ex")) for a in rest):
-        return "git rebase --exec(任意のコマンドを走らせるため。中身は確認しない)"
-    for a in rest:
-        if (a == "-c" or re.match(r"-c.+=", a) or a.startswith(("--conf", "--template", "--upl", "--rec"))
-                or "ext::" in a or (a == "-u" and sub in ("fetch", "pull", "clone"))):
-            return f"git {sub} の設定上書き・外部コマンドを走らせる指定({a})"
+def _check_env(norm):
+    for m in _ENV_ASSIGN.finditer(norm):
+        if (m.group(1), m.group(2)) not in _SAFE_ENV:
+            return f"git の設定や外部コマンドを環境変数で仕込むコマンド({m.group(1)}=...)"
     return None
 
 
-def _check_gh_api(args):
-    for k, a in enumerate(args):
-        if a in _GH_WRITE_FLAGS or a.startswith(("--field=", "--raw-field=", "--input=")):
-            return "gh api(書き込みの引数つき)"
-        if re.fullmatch(r"-[fF].+", a):
-            return "gh api(書き込みの引数つき)"
-        m = re.fullmatch(r"(?:-X=?|--method=?)(.*)", a)
-        if m:
-            method = m.group(1) or (args[k + 1] if k + 1 < len(args) else "")
-            if method.upper() != "GET":
-                return f"gh api(メソッド {method})"
+def _check_catch_all(norm):
+    """先頭のプログラムに関係なく、git の後ろの push / send-email、gh の書き込み形を止める。"""
+    text = norm.casefold()
+    if _CATCH_GIT.search(text):
+        return "git push / send-email の語を含むコマンド(インタプリタや未知のラッパー経由も止める)"
+    if _CATCH_GH.search(text):
+        return "gh の書き込み形の語を含むコマンド"
+    if _CATCH_GH_API.search(text) and _CATCH_API_WRITE.search(text):
+        return "gh api の書き込み形の語を含むコマンド"
     return None
 
 
-def _check_gh(args):
-    subs, i = [], 0
-    while i < len(args) and len(subs) < 2:
-        a = args[i]
-        if a in ("-R", "--repo"):
-            i += 2; continue
-        if not a.startswith("-"):
-            subs.append(a)
-            if subs[0] in ("api", "search"):
-                break
-        i += 1
-    if not subs:
-        return None
-    if subs[0] == "search":
-        return None
-    if subs[0] == "api":
-        return _check_gh_api(args[i + 1:])
-    if len(subs) == 2 and subs[1] in _GH_READ.get(subs[0], ()):
-        return None
-    return "gh " + " ".join(subs) + "(読み取り以外の gh)"
+def _home_path(path, cwd, home):
+    p = path
+    for pre in ("${HOME}", "$HOME", "~"):
+        if p == pre or p.startswith(pre + "/"):
+            p = home + p[len(pre):]
+            break
+    if not posixpath.isabs(p):
+        p = posixpath.join(cwd or home, p)
+    return posixpath.normpath(p).casefold()
 
 
-def _shell_script_reason(toks, depth):
-    """シェル呼び出しの判定。-c の中身は再帰、標準入力から読む形は止める、スクリプトファイルは通す。"""
+def _check_cd(toks, cwd, home):
+    """cd / pushd でホームの .claude に入るのを止める。"""
+    if not toks or _base(toks[0]) not in ("cd", "pushd", "chdir"):
+        return None
+    args = [t for t in toks[1:] if not t.startswith("-")]
+    if not args:
+        return None
+    target = _home_path(args[0], cwd, home)
+    protected = posixpath.normpath(posixpath.join(home, ".claude")).casefold()
+    if target == protected or target.startswith(protected + "/"):
+        return "ホームの .claude への cd / pushd"
+    return None
+
+
+def _shell_script_reason(toks, depth, ctx):
+    """シェル呼び出しの判定。-c の中身は再帰、標準入力から読む形・実行ファイルが不明な形は止める。"""
     args = toks[1:]
     if any(a in ("--version", "--help") for a in args):
         return None
@@ -183,13 +156,25 @@ def _shell_script_reason(toks, depth):
             files.append(a)
         i += 1
     if has_c:
-        return check_bash(script, depth + 1) if script else None
+        return check_bash(script, depth + 1, *ctx) if script else None
     if stdin_s or not files or files[0].startswith("/dev/"):
         return "標準入力から読ませるシェル(パイプ・リダイレクト越しのスクリプトは中身を確認できない)"
     return None
 
 
-def _check_tokens(toks, depth):
+def _env_split_string(toks):
+    """env -S / --split-string の引数を、続きのコマンドと合わせて1つの文字列に戻す(なければ None)。"""
+    for k, t in enumerate(toks[1:], 1):
+        if t in ("-S", "--split-string") and k + 1 < len(toks):
+            return " ".join(toks[k + 1:])
+        if t.startswith("--split-string="):
+            return " ".join([t.split("=", 1)[1]] + toks[k + 1:])
+        if t.startswith("-S") and len(t) > 2:
+            return " ".join([t[2:]] + toks[k + 1:])
+    return None
+
+
+def _check_tokens(toks, depth, ctx):
     n = 0
     while n < len(toks) and re.fullmatch(r"\w+=.*", toks[n]):
         n += 1
@@ -198,57 +183,62 @@ def _check_tokens(toks, depth):
         return None
     if depth > _MAX_DEPTH:
         return "コマンドの入れ子が深すぎて中身を確認できない"
+    reason = _check_cd(toks, *ctx)
+    if reason:
+        return reason
     prog = _base(toks[0]).casefold()
+    if prog == "env":
+        inner = _env_split_string(toks)
+        if inner is not None:
+            return check_bash(inner, depth + 1, *ctx)
     if prog in _WRAPPERS:
         for k in range(1, len(toks)):
             if _base(toks[k]).casefold() in _GIT_LIKE:
-                return _check_tokens(toks[k:], depth + 1)
+                return _check_tokens(toks[k:], depth + 1, ctx)
         return None
-    if prog in ("git-send-email",):
+    if prog == "git-send-email":
         return "git send-email"
     if prog == "git":
-        return _check_git(toks[1:], depth)
+        return check_git(toks[1:])
     if prog == "gh":
-        return _check_gh(toks[1:])
+        return check_gh(toks[1:])
     if prog == "eval":
-        return check_bash(" ".join(toks[1:]), depth + 1)
+        return check_bash(" ".join(toks[1:]), depth + 1, *ctx)
     if prog in _SHELLS:
-        return _shell_script_reason(toks, depth)
+        return _shell_script_reason(toks, depth, ctx)
     return None
 
 
 def _check_indirection(all_words, norm):
-    """xargs / parallel / find -exec は、コマンド内に git か gh が現れたら止める(何を渡すか追えないため)。"""
-    if not _GIT_TOKEN.search(norm):
+    """xargs / parallel / find -exec は、コマンドに git か gh のコマンド語が現れたら止める(何を渡すか追えないため)。"""
+    if not any(_is_git_word(w) for w in _WORD_SPLIT.split(norm) if w):
         return None
     for k, w in enumerate(all_words):
-        base = _base(w)
+        base = _base(w).casefold()
         if base in ("xargs", "parallel"):
             return f"{base} 経由の git / gh 呼び出し"
-        if base == "find" and any(x in _FIND_EXEC for x in all_words[k + 1:]):
+        if base == "find" and any(x in _FIND_EXEC for x in (y.casefold() for y in all_words[k + 1:])):
             return "find -exec 経由の git / gh 呼び出し"
     return None
 
 
-def check_bash(cmd, depth=0):
-    """止めるべきなら理由(日本語の短い説明)を、通してよければ None を返す。"""
+def check_bash(cmd, depth=0, cwd=None, home=None):
+    """止めるべきなら理由(日本語の短い説明)を、通してよければ None を返す。cwd は呼び出し時の作業ディレクトリ。"""
     if depth > _MAX_DEPTH + 1:
         return "コマンドの入れ子が深すぎて中身を確認できない"
+    home = home or os.path.expanduser("~")
+    ctx = (cwd, home)
     segments = split_segments(cmd)
     norm = cmd.replace('"', "").replace("'", "").replace("\\", "")
-    reason = check_tamper(cmd, segments)
-    if reason:
-        return reason
-    if _GIT_ENV.search(norm):
-        return "git の設定を環境変数で上書きするコマンド(GIT_CONFIG* など)"
+    for reason in (check_tamper(cmd, segments, cwd, home), _check_env(norm), _check_catch_all(norm)):
+        if reason:
+            return reason
     token_lists = [_tokens(seg) for seg in segments]
     reason = _check_indirection([w for toks in token_lists for w in toks], norm)
     if reason:
         return reason
     for toks in token_lists:
-        reason = _check_tokens(toks, depth)
+        reason = _check_tokens(toks, depth, ctx)
         if reason:
             return reason
-    if re.search(r"\b(?:python[\d.]*|node|perl|ruby|php)\b[^\n]*(?:\s-[cer]\b|<<)", cmd) and _INLINE_PUSH.search(norm):
-        return "インタプリタ経由の push / gh 呼び出しの疑い"
     return None

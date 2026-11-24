@@ -23,7 +23,15 @@ GIT_ALLOWED = [
     "git tag v1", "git fetch origin", "git pull --ff-only", "git ls-files", "git grep foo", "git blame a",
     "git init", "git clone https://example.com/r.git", "git describe", "git shortlog -sn", "git reflog",
     "git stash list", "git config --get user.name", "git config --get-all x", "git config --list",
-    "git config -l", "git -C /x status", "git --no-pager log", "git commit -C abc", "git rebase --continue", "git rebase main",
+    "git config -l", "git -C /x status", "git --no-pager log", "git commit -C abc", "git commit -c abc", "git log -c", "git diff -c", "git rm a", "git mv a b", "git revert HEAD",
+    "git apply x.patch", "git am x.mbox", "git format-patch -1", "git clean -n", "git rev-list HEAD", "git merge-base a b",
+    "git ls-remote origin", "git cat-file -p HEAD", "git diff-tree HEAD", "git show-ref", "git for-each-ref", "git name-rev HEAD",
+    "git symbolic-ref HEAD", "git symbolic-ref --short HEAD", "git bisect start", "git bisect good", "git remote", "git remote -v",
+    "git remote show origin", "git remote get-url origin", "GIT_EDITOR=true git rebase --continue", "GIT_SEQUENCE_EDITOR=: git rebase main",
+    "EDITOR=true git commit", "VISUAL=: git commit", "GIT_PAGER=cat git log", "PAGER=cat git log", "GIT_TERMINAL_PROMPT=0 git fetch",
+    "GIT_EDITOR='true' git commit", "git diff --config=a=b",
+    "git log --color", "git log --color=always", "git diff --exit-code", "git ls-files --exclude=x", "git pull --recurse-submodules",
+    "git rebase --empty=drop main", "git fetch --tags", "git rebase -i main", "git clone --depth 1 u", "git clone --recurse-submodules u", "git rebase --continue", "git rebase main",
 ]
 
 GIT_BLOCKED = [
@@ -36,10 +44,17 @@ GIT_BLOCKED = [
     "git rebase -x'git push' main", "git rebase --exe 'git push' main", "git rebase --ex='git push' main",
     "git fetch --upl=x o", "git pull --rec=x o", "GIT push", "/usr/bin/GIT push", "GH pr create",
     "git rebase -x true main", "git rebase --exec=true main", "git rebase -xtrue main",
-    "GIT_EDITOR=true git rebase --continue", "EDITOR=x git commit", "VISUAL=x git commit",
+    "EDITOR=x git commit", "GIT_EDITOR=vim git commit", "GIT_EDITOR=true GIT_DIR=x git status", "PAGER=less git log",
+    "GIT_TERMINAL_PROMPT=1 git fetch", "git notes add -m x", "git remote add o u", "git remote set-url o u", "git remote rm o",
+    "git symbolic-ref HEAD refs/heads/x", "git bisect run sh t.sh", "git clone -c core.fsmonitor=x u", "git clone --config=x u",
+    "git clone -ca=b u",
+    "git clone --conf=x u", "git clone --config x u", "git fetch --upl x o", "git pull --rec=x o", "git clone --templ=x u",
+    "git rebase --ex true main", "git rebase -ix true", "git clone -qc a=b u", "git fetch -pu", "git --config-e=a=B status",
+    "git clone --upload-pa=x u", "echo o | XARGS GIT push", "echo o | xargs /usr/bin/GIT push", "FIND . -EXEC git status {} +",
+    "python3 -c \"import subprocess; subprocess.run(['GIT','PUSH'])\"", "git -ca=b status", "git -c a=b commit -c abc", "VISUAL=x git commit",
     "SSH_ASKPASS=x git fetch", "env GIT_PAGER=x git log", "env EDITOR=x git commit", "FOO=1 GIT_DIR=x git status",
-    "git commit -c abc", "git log -c", "git diff --config=a=b", "git clone --template=/x u", "git clone -u x u",
-    "git fetch -u", "git pull --upload-pack=x", "git status -cfoo=bar", "git log --conf=x",
+    "git clone --template=/x u", "git clone -u x u",
+    "git fetch -u", "git pull --upload-pack=x",
     "git fetch o ext::sh", "git commit --receive-pack=x",
     "GIT_CONFIG_COUNT=1 git status", "GIT_SSH_COMMAND=x git fetch", "export GIT_CONFIG_KEY_0=core.fsmonitor",
 ]
@@ -56,12 +71,30 @@ INDIRECTION_BLOCKED = [
     "bash --init-file x", "sh", "bash -x", "zsh -o errexit",
 ]
 
+CATCH_ALL_BLOCKED = [
+    "python3 -c \"import subprocess; subprocess.run(['git','push'])\"",
+    "node -e \"require('child_process').execSync('git push')\"", "osascript -e 'do shell script \"git push\"'",
+    "unknownwrap git push", "grep 'git push' x", "git commit -m 'fix push bug'", "echo git send-email",
+    "python3 -c \"import os; os.system('gh pr create')\"", "x gh pr merge 3", "x gh issue comment 3", "x gh release upload v1 f",
+    "x gh repo fork", "x gh workflow run a.yml", "x gh api -X POST y", "x gh api y --method=PATCH", "x gh api y -f a=b",
+    "x gh api y --input f", "x GH PR REVIEW 3", "python3 - <<EOF\nimport subprocess\nsubprocess.run(['git', 'push'])\nEOF",
+    "env -S 'git push'", "env -S'git push'", "env --split-string='git push'", "env -S 'sh -c \"git push\"'",
+    "caffeinate git push", "doas git push", "script -q /dev/null git push", "arch -arm64 git push", "watch git push",
+    "flock l git push", "fish -c 'git push'", "csh -c 'git push'", "tcsh -c 'git push'", "ksh -c 'git push'",
+    "fish", "caffeinate sh", "echo x | tcsh", "caffeinate git frobnicate",
+]
+
+CATCH_ALL_ALLOWED = ["env -S 'ls -l'", "caffeinate pnpm test", "watch ls", "arch -arm64 pnpm test", "flock l pnpm test",
+                     "fish scripts/t.fish", "gh api repos/o/r/pulls", "gh pr view 3", "env A=1 ls"]
+
 INDIRECTION_ALLOWED = [
     "bash scripts/test.sh", "sh ./build.sh arg", "bash -c 'ls'", "bash -c -- 'ls'", "bash -n x.sh",
     "bash --version", "find . -name '*.py' -exec wc -l {} +", "ls | xargs wc -l", "echo a | parallel echo",
     "find . -type f", "bash -x scripts/test.sh", "pnpm test", "bash -o pipefail scripts/t.sh",
     "bash -O extglob scripts/t.sh", "bash +o history scripts/t.sh", "bash --rcfile r.sh scripts/t.sh",
     "bash -o pipefail -c 'ls'",
+    "find . -path ./.git -prune -o -name '*.ts' -exec wc -l {} +", "ls .git | xargs wc -l", "find .github -exec wc -l {} +",
+    "find . -path ./.git/x -exec ls {} +",
 ]
 
 TAMPER_BLOCKED = [
@@ -77,8 +110,14 @@ TAMPER_BLOCKED = [
     "cat ~/.claude/settings.json", "ls .claude/hooks/", "cat ~/.claude/settings.local.json",
     "bash -c 'rm ~/.claude/x'", "eval 'rm ~/.claude/x'", "rm ~/.claude/night-{mode,x}.json",
     "workops night end", "pnpm workops night start",
-    "echo x > ~/.CLAUDE/settings.json", "rm ~/.Claude/x", "RM ~/.claude/x", "cat ~/.CLAUDE/NIGHT-MODE.JSON",
+    "echo x > ~/.CLAUDE/settings.json", "rm ~/.Claude/x", "RM ~/.claude/x", "cd ~/.claude && rm n*", "echo {} > .claude/settings.local.json", "rm $HOME/.claude/x",
+    "rm ${HOME}/.claude/worktrees/x", "rm ~/.claude/worktrees/x", "rm -rf .claude/worktrees", "rm .claude",
+    "rm .claude/worktrees/w/.claude/hooks/x", "rm .claude/worktrees/w/.claude/settings.json", "rm .claude/rules/x.md",
+    "rm .claude/worktrees/w/night-mode.json", "cd .claude && rm x", "rm /r/.claude/", "cat ~/.CLAUDE/NIGHT-MODE.JSON",
     "ls ~/.CLAUDE/HOOKS/", "rm ~/.CLAUDE/NIGHT*",
+    "echo x > repo/.git/config", "rm repo/.git/hooks/pre-push", "cp x .git/hooks/pre-commit", "tee .git/info/exclude",
+    "sed -i s/a/b/ .git/config", "rm .GIT/HOOKS/x", "echo x >> .git/worktrees/w/config", "chmod +x .git/hooks/pre-push",
+    "rm .git/modules/m/hooks/x", "echo x > .git/modules/a/modules/b/config", "cp x .git/worktrees/w/modules/m/info/y",
 ]
 
 TAMPER_ALLOWED = [
@@ -86,7 +125,9 @@ TAMPER_ALLOWED = [
     "ls .claude/agents 2>&1", "git commit -m 'fix .claude rules install'", "cat .claude/CLAUDE.md > /dev/null",
     "echo x > out.txt", "rm out.txt", "ls ~/.claude/*.md", "grep -r foo .claude/rules", "pnpm install",
     "sed -n 1,5p .claude/rules/x.md", "cat .git/config", "ls .git/hooks", "git status > out.txt",
-    "rm out/.gitignore", "cat .git/info/exclude", "git commit -m 'fix hooks' -- a.py", "ls *.json",
+    "rm out/.gitignore", "rm .claude/worktrees/x/a.txt", "echo x > /repo/.claude/worktrees/w/out.txt",
+    "cp a /repo/.claude/worktrees/w/b", "rm -rf .CLAUDE/Worktrees/x/a", "mv .claude/worktrees/w/a .claude/worktrees/w/b",
+    "sed -i s/a/b/ /r/.claude/worktrees/w/f.md", "cat .git/info/exclude", "git commit -m 'fix hooks' -- a.py", "ls *.json",
 ]
 
 
@@ -117,8 +158,38 @@ class BashTables(unittest.TestCase):
     def test_tamper_allowed(self):
         self.check(TAMPER_ALLOWED, False)
 
+    def test_catch_all_blocked(self):
+        self.check(CATCH_ALL_BLOCKED, True)
+
+    def test_catch_all_allowed(self):
+        self.check(CATCH_ALL_ALLOWED, False)
+
+    def test_cwd_inside_claude_applies_tamper_checks(self):
+        home = "/h"
+        for cwd in ["/h/.claude", "/h/.claude/rules", "/r/.claude", "/r/.claude/rules", "/h/.claude/worktrees/w",
+                    "/R/.CLAUDE/x"]:
+            for cmd in ["rm a", "echo x > f", "mv a b", "sed -i s/a/b/ f", "tee f", "cp a b"]:
+                self.assertTrue(check_bash(cmd, 0, cwd, home), f"{cwd}: {cmd}")
+            for cmd in ["ls", "cat a", "pnpm test", "git status"]:
+                self.assertIsNone(check_bash(cmd, 0, cwd, home), f"{cwd}: {cmd}")
+
+    def test_cwd_outside_claude_or_in_project_worktree_allowed(self):
+        home = "/h"
+        for cwd in ["/r", "/h", "/r/.claude/worktrees/w", "/r/.claude/worktrees/w/src", "/r/.claude/worktrees", None]:
+            for cmd in ["rm a", "echo x > f", "cp a b"]:
+                self.assertIsNone(check_bash(cmd, 0, cwd, home), f"{cwd}: {cmd}")
+
+    def test_cd_into_home_claude_blocked(self):
+        home = "/h"
+        for cmd in ["cd /h/.claude", "cd ~/.claude", "pushd $HOME/.claude", "cd ${HOME}/.claude/x", "cd -P ~/.claude",
+                    "cd /H/.CLAUDE", "ls && cd ~/.claude", "cd /h/.claude/worktrees/w"]:
+            self.assertTrue(check_bash(cmd, 0, "/r", home), cmd)
+        self.assertTrue(check_bash("cd .claude", 0, "/h", home))
+        for cmd in ["cd /r", "cd ~", "cd /h", "cd /r/.claude/worktrees/w", "cd", "pushd /r"]:
+            self.assertIsNone(check_bash(cmd, 0, "/r", home), cmd)
+
     def test_depth_limit_blocks_with_reason(self):
-        deep = "git push"
+        deep = "echo hi"
         for _ in range(6):
             deep = "bash -c " + __import__("shlex").quote(deep)
         reason = check_bash(deep)
@@ -134,7 +205,7 @@ class BashTables(unittest.TestCase):
                     "gh api x -f a=b", "gh api -X POST x"]:
             self.assertTrue(check_bash(cmd), cmd)
         for cmd in ["gh pr view 3", "gh pr list --json number", "gh api repos/o/r/pulls", "gh run watch 5",
-                    "gh -R o/r pr view 3", "git commit -m 'git push は使わない'"]:
+                    "gh -R o/r pr view 3"]:
             self.assertIsNone(check_bash(cmd), cmd)
 
 
@@ -176,7 +247,8 @@ class FileTable(unittest.TestCase):
 
     def test_git_internals_blocked(self):
         for p in ["/r/.git/config", "/r/.git/hooks/pre-push", "/r/.git/info/exclude", "/r/.GIT/Hooks/x",
-                  "/r/.git/worktrees/w/config", "/r/.git/worktrees/w/hooks/x"]:
+                  "/r/.git/worktrees/w/config", "/r/.git/modules/m/config", "/r/.git/modules/a/modules/b/hooks/x",
+                  "/r/.git/worktrees/w/modules/m/info/x", "/r/.git/worktrees/w/hooks/x"]:
             self.assertTrue(self.check(p), p)
         for p in ["/r/.gitignore", "/r/.github/config", "/r/src/config", "/r/.git/HEAD"]:
             self.assertIsNone(self.check(p), p)

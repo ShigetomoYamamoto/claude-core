@@ -39,7 +39,9 @@ MCP_BLOCKED = [U + t for t in ("slack_send_message", "slack_send_message_draft",
     "mcp__plugin_github_github__push_files", "mcp__plugin_github_github__add_issue_comment",
     "mcp__plugin_github_github__create_or_update_file", "mcp__workspace-mcp-write__modify_sheet_values",
     "mcp__Claude_Browser__navigate", "mcp__Claude_Browser__computer", "mcp__terminal__run_in_terminal",
-    "mcp__ccd_pr__set_auto_merge", "mcp__ccd_session__move_to_cloud"]
+    "mcp__ccd_pr__set_auto_merge", "mcp__ccd_session__move_to_cloud",
+    "mcp__visualizeX__slack_send_message", "mcp__ccd_session_mgmt_evil__send_message",
+    "mcp__unityMCPx__send_message", "mcp__ccd_turnstile__send_message"]
 
 MCP_ALLOWED = [U + "slack_read_channel", U + "slack_search_public", G + "search_threads", G + "get_thread",
                G + "list_drafts", N + "notion-fetch", N + "notion-search", N + "notion-query-data-sources",
@@ -51,7 +53,8 @@ MCP_ALLOWED = [U + "slack_read_channel", U + "slack_search_public", G + "search_
                "mcp__unityMCP-desktop__manage_editor", "mcp__unityMCP-desktop__run_tests",
                "mcp__unityMCP-desktop__manage_scene", "mcp__ccd_session_mgmt__send_message",
                "mcp__ccd_session_mgmt__list_sessions", "mcp__ccd_turn__update_plan",
-               "mcp__Claude_Browser__read_page"]
+               "mcp__Claude_Browser__read_page", "mcp__visualize__show", "mcp__unityMCP__manage_scene",
+               "mcp__scheduled-tasks__create_scheduled_task", "mcp__Claude_Code_iOS_Simulator__tap"]
 
 MARKER_REL = os.path.join(".claude", "night-mode.json")
 
@@ -68,8 +71,8 @@ class Env:
             with open(self.marker, "w", encoding="utf-8") as f:
                 f.write(marker)
 
-    def run(self, tool, tool_input=None):
-        payload = {"tool_name": tool, "tool_input": tool_input or {}, "cwd": self.home}
+    def run(self, tool, tool_input=None, cwd=None):
+        payload = {"tool_name": tool, "tool_input": tool_input or {}, "cwd": cwd or self.home}
         return subprocess.run(["python3", HOOK], input=json.dumps(payload), capture_output=True,
                               text=True, env={**os.environ, "HOME": self.home})
 
@@ -167,7 +170,9 @@ class NightModeGuardTest(unittest.TestCase):
                    "gh api repos/o/r --method=PATCH", "gh api repos/o/r -XDELETE", "gh api x --input f.json",
                    "gh api x -F a=b", "gh api x --field a=b", "gh pr checkout 3", "gh pr",
                    "echo $(git push)", "echo \"$(git push)\"", "cat .claude/hooks/x.py",
-                   "vi .claude/settings.local.json", "n\"ight\"-mode", "pnpm workops night start",
+                   "vi .claude/settings.local.json",
+                   "git commit -m \"fix; git push は使わない\"", "echo 'git push'", "git branch --list push*",
+                   "env -S 'git push'", "caffeinate git push", "n\"ight\"-mode", "pnpm workops night start",
                    "python3 -c \"import subprocess; subprocess.run(['git','push'])\""]
         for cmd in blocked:
             self.assertEqual(e.run("Bash", {"command": cmd}).returncode, 2, cmd)
@@ -178,8 +183,8 @@ class NightModeGuardTest(unittest.TestCase):
                    "gh api repos/o/r/pulls", "pnpm test", "ls", "git log --oneline", "git -C /x status",
                    "git diff && git add a", "git worktree add ../x -b y", "gh api -X GET repos/o/r",
                    "gh search issues foo", "gh run watch 5", "gh release download v1", "gh auth status",
-                   "git commit -m \"fix; git push は使わない\"", "echo 'git push'", "gh -R o/r pr view 3",
-                   "git branch --list push*", "gh repo clone o/r", "gh pr list --json number"]
+                   "gh -R o/r pr view 3",
+                   "gh repo clone o/r", "gh pr list --json number"]
         for cmd in allowed:
             r = e.run("Bash", {"command": cmd})
             self.assertEqual(r.returncode, 0, f"{cmd}: {r.stderr}")
@@ -213,6 +218,14 @@ class NightModeGuardTest(unittest.TestCase):
             self.assertEqual(e.run("Bash", {"command": cmd}).returncode, 0, cmd)
         for p in ("/repo/.claude/hooks/x.py", "/repo/.claude/settings.backup.json"):
             self.assertEqual(e.run("Write", {"file_path": p}).returncode, 2, p)
+
+    def test_cwd_from_payload_is_used(self):
+        e = self.env(marker_json(3))
+        inside = os.path.join(e.home, ".claude")
+        self.assertEqual(e.run("Bash", {"command": "rm a.txt"}, cwd=inside).returncode, 2)
+        self.assertEqual(e.run("Bash", {"command": "ls"}, cwd=inside).returncode, 0)
+        self.assertEqual(e.run("Bash", {"command": "rm a.txt"}, cwd="/repo/.claude/worktrees/w").returncode, 0)
+        self.assertEqual(e.run("Bash", {"command": "cd ~/.claude"}).returncode, 2)
 
     def test_no_marker_still_allows_hardened_cases(self):
         e = self.env(None)
