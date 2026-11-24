@@ -30,7 +30,7 @@ engineering・work-agent はそれぞれ対象プロジェクトへ個別イン�
 |---|---|
 | `hooks/` | ドメイン中立の安全装置（シークレット検出・秘匿ファイルのステージ防止・doc 生成ブロック・大量削除確認・main-loop-execution-guard） |
 | `rules/` | ドメイン中立の運用ルール（answer-only・collaboration-style・claude-efficiency・doc-language・memory・role-separation・safety-irreversible・secret-hygiene） |
-| `skills/` | ドメイン中立スキル（3-line-contract, memory-dream） |
+| `skills/` | ドメイン中立スキル（memory-dream） |
 | `docs/` | 要件定義・アーキテクチャ・ADR・移行資料（`docs/migration/`） |
 | `installer.py` / `install.py` | copy 型インストーラ本体（manifest ベース。symlink は使わない。`--dry-run` / `verify` / `uninstall` 対応） |
 | `settings-fragment.json` | core が配線する hook のみを含む settings 断片（`__TARGET__` を解決してマージ） |
