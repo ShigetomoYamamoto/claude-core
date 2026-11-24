@@ -203,6 +203,23 @@ class NightModeGuardTest(unittest.TestCase):
         self.assertEqual(e.run("Write", {"file_path": MARKER_REL}).returncode, 2)  # cwd=HOME からの相対
         self.assertEqual(e.run("Write", {"file_path": "~/.claude/settings.json"}).returncode, 2)
 
+    def test_hardening_wired_end_to_end(self):
+        e = self.env(marker_json(3))
+        for cmd in ["git p", "git -c alias.p=push p", "echo x | sh", "bash -s", "echo o | xargs git push",
+                    "rm " + e.marker, "rm ~/.claude/night*", "sed -i s/a/b/ .claude/x",
+                    "find ~/.claude -delete", "git config user.name x"]:
+            self.assertEqual(e.run("Bash", {"command": cmd}).returncode, 2, cmd)
+        for cmd in ["bash scripts/test.sh", "git config --get user.name", "git commit -m x"]:
+            self.assertEqual(e.run("Bash", {"command": cmd}).returncode, 0, cmd)
+        for p in ("/repo/.claude/hooks/x.py", "/repo/.claude/settings.backup.json"):
+            self.assertEqual(e.run("Write", {"file_path": p}).returncode, 2, p)
+
+    def test_no_marker_still_allows_hardened_cases(self):
+        e = self.env(None)
+        for cmd in ["git p", "echo x | sh", "rm ~/.claude/night-mode.json"]:
+            r = e.run("Bash", {"command": cmd})
+            self.assertEqual((r.returncode, r.stdout, r.stderr), (0, "", ""), cmd)
+
 
 if __name__ == "__main__":
     unittest.main()

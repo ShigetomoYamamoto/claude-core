@@ -2,17 +2,29 @@
 
 コマンド文字列を、クォートを考慮して区切り、各コマンドの先頭語を見る。
 `g"it" push` / `\\git push` / `git -C x push` / `sh -c '...'` / `sudo git push` も同じ形に直して判定する。
-これは検出網であり境界ではない(ADR-028)。curl での POST などは見ない。
+これは検出網であり境界ではない(ADR-028)。curl での POST・スクリプトファイルの中身・
+インタプリタ内の subprocess などは見ない(ADR-036 の限界)。
 """
 import re
 import shlex
+
+from _night_mode_tamper import check_tamper
 
 _GIT_LIKE = {"git", "gh", "git-send-email", "sh", "bash", "zsh", "dash", "ksh", "eval"}
 _SHELLS = {"sh", "bash", "zsh", "dash", "ksh"}
 _WRAPPERS = {"command", "builtin", "sudo", "env", "time", "nohup", "exec", "nice", "xargs",
              "then", "do", "else", "if", "while", "until", "!", "timeout", "stdbuf"}
-_GIT_VALUE_OPTS = {"-C", "-c", "--git-dir", "--work-tree", "--namespace", "--exec-path", "--config-env"}
-_GIT_BLOCKED = {"push", "send-email"}
+_GIT_VALUE_OPTS = {"-C", "--git-dir", "--work-tree", "--namespace", "--exec-path"}
+_GIT_CONFIG_OPTS = {"-c", "--config-env"}
+# 夜間モード中に通す git のサブコマンド(ローカル・読み取り中心)。これ以外(push・send-email・別名・未知)は止める。
+_GIT_ALLOWED = {"add", "commit", "status", "log", "diff", "show", "branch", "checkout", "switch", "restore",
+                "reset", "rev-parse", "worktree", "merge", "rebase", "cherry-pick", "tag", "fetch", "pull",
+                "ls-files", "grep", "blame", "init", "clone", "describe", "shortlog", "reflog", "stash",
+                "config"}
+_GIT_CONFIG_READ = {"--get", "--get-all", "--list", "-l"}
+_GIT_ENV = re.compile(r"\bGIT_(?:CONFIG\w*|SSH_COMMAND|EXTERNAL_DIFF)=")
+_GIT_TOKEN = re.compile(r"(?<![\w])(?:git|gh)(?![\w])")
+_MAX_DEPTH = 3
 _GH_READ = {
     "pr": {"view", "list", "status", "diff", "checks"},
     "issue": {"view", "list", "status"},
@@ -23,9 +35,10 @@ _GH_READ = {
     "auth": {"status"},
 }
 _GH_WRITE_FLAGS = {"-f", "-F", "--field", "--raw-field", "--input"}
-_PROTECTED = (".claude/settings.json", ".claude/settings.local.json", ".claude/hooks/", "night-mode")
-_WORKOPS_NIGHT = re.compile(r"\bworkops\b.*\bnight\b.*\b(?:start|end)\b")
 _INLINE_PUSH = re.compile(r"\bgit\b.*\bpush\b|\bsend-email\b|\bgh\b\W+(?:pr|issue|release|api|repo|workflow|gist)\b")
+_FIND_EXEC = {"-exec", "-execdir", "-ok", "-okdir"}
+_REDIR_OP = re.compile(r"\d*(?:<<<|<<-?|<>|<|>>|>\|?|&>)")
+_REDIR_ATTACHED = re.compile(r"\d*(?:<<<|<<-?|<|>>|>)\S+")
 
 
 def split_segments(cmd):
@@ -63,15 +76,44 @@ def _base(tok):
     return tok.rsplit("/", 1)[-1]
 
 
-def _check_git(args):
-    i = 0
+def _base(tok):
+    return tok.rsplit("/", 1)[-1]
+
+
+def _git_sub(args):
+    """グローバルオプションを飛ばして (サブコマンド, 残りの引数, -c の有無) を返す。"""
+    i, config = 0, False
     while i < len(args):
         a = args[i]
-        if a in _GIT_VALUE_OPTS:
+        if a in _GIT_CONFIG_OPTS or a.startswith("--config-env="):
+            config = True
+        if a in _GIT_VALUE_OPTS or a in _GIT_CONFIG_OPTS:
             i += 2; continue
         if a.startswith("-"):
             i += 1; continue
-        return f"git {a}" if a in _GIT_BLOCKED else None
+        return a, args[i + 1:], config
+    return None, [], config
+
+
+def _check_git(args, depth):
+    sub, rest, config = _git_sub(args)
+    if config:
+        return "git -c(設定の上書き。別名や外部コマンドの経路になるため)"
+    if sub is None:
+        return None
+    if sub not in _GIT_ALLOWED:
+        return f"git {sub}(夜間モードで通すのはローカルの git だけ)"
+    if sub == "config" and not (_GIT_CONFIG_READ & set(rest)):
+        return "git config の書き込み"
+    if sub == "rebase":
+        for k, a in enumerate(rest):
+            if a in ("-x", "--exec") and k + 1 < len(rest):
+                return check_bash(rest[k + 1], depth + 1)
+            if a.startswith("--exec="):
+                return check_bash(a[7:], depth + 1)
+    if sub in ("fetch", "pull", "clone") and any(
+            a.startswith(("--upload-pack", "--receive-pack", "ext::")) or a == "-u" for a in rest):
+        return f"git {sub}(外部コマンドを走らせる指定)"
     return None
 
 
@@ -111,13 +153,50 @@ def _check_gh(args):
     return "gh " + " ".join(subs) + "(読み取り以外の gh)"
 
 
+def _shell_script_reason(toks, depth):
+    """シェル呼び出しの判定。-c の中身は再帰、標準入力から読む形は止める、スクリプトファイルは通す。"""
+    args = toks[1:]
+    if any(a in ("--version", "--help") for a in args):
+        return None
+    script, has_c, stdin_s, files = None, False, False, []
+    i = 0
+    while i < len(args):
+        a = args[i]
+        if re.fullmatch(r"-[a-zA-Z]*c[a-zA-Z]*", a) and script is None and not has_c:
+            has_c = True
+            j = i + 1
+            while j < len(args) and args[j].startswith("-"):
+                j += 1
+            script = args[j] if j < len(args) else None
+            i = j + 1
+            continue
+        if _REDIR_OP.fullmatch(a):
+            i += 2; continue
+        if _REDIR_ATTACHED.fullmatch(a):
+            i += 1; continue
+        if re.fullmatch(r"-[a-zA-Z]*s[a-zA-Z]*", a) and not has_c:
+            stdin_s = True
+        if a == "-":
+            stdin_s = True
+        elif not a.startswith("-"):
+            files.append(a)
+        i += 1
+    if has_c:
+        return check_bash(script, depth + 1) if script else None
+    if stdin_s or not files or files[0].startswith("/dev/"):
+        return "標準入力から読ませるシェル(パイプ・リダイレクト越しのスクリプトは中身を確認できない)"
+    return None
+
+
 def _check_tokens(toks, depth):
     n = 0
     while n < len(toks) and re.fullmatch(r"\w+=.*", toks[n]):
         n += 1
     toks = toks[n:]
-    if not toks or depth > 3:
+    if not toks:
         return None
+    if depth > _MAX_DEPTH:
+        return "コマンドの入れ子が深すぎて中身を確認できない"
     prog = _base(toks[0])
     if prog in _WRAPPERS:
         for k in range(1, len(toks)):
@@ -127,29 +206,46 @@ def _check_tokens(toks, depth):
     if prog in ("git-send-email",):
         return "git send-email"
     if prog == "git":
-        return _check_git(toks[1:])
+        return _check_git(toks[1:], depth)
     if prog == "gh":
         return _check_gh(toks[1:])
     if prog == "eval":
         return check_bash(" ".join(toks[1:]), depth + 1)
     if prog in _SHELLS:
-        for k, t in enumerate(toks[1:-1], 1):
-            if re.fullmatch(r"-[a-z]*c", t):
-                return check_bash(toks[k + 1], depth + 1)
+        return _shell_script_reason(toks, depth)
+    return None
+
+
+def _check_indirection(all_words, norm):
+    """xargs / parallel / find -exec は、コマンド内に git か gh が現れたら止める(何を渡すか追えないため)。"""
+    if not _GIT_TOKEN.search(norm):
+        return None
+    for k, w in enumerate(all_words):
+        base = _base(w)
+        if base in ("xargs", "parallel"):
+            return f"{base} 経由の git / gh 呼び出し"
+        if base == "find" and any(x in _FIND_EXEC for x in all_words[k + 1:]):
+            return "find -exec 経由の git / gh 呼び出し"
     return None
 
 
 def check_bash(cmd, depth=0):
     """止めるべきなら理由(日本語の短い説明)を、通してよければ None を返す。"""
+    if depth > _MAX_DEPTH + 1:
+        return "コマンドの入れ子が深すぎて中身を確認できない"
+    segments = split_segments(cmd)
     norm = cmd.replace('"', "").replace("'", "").replace("\\", "")
-    for text in (cmd, norm):
-        for key in _PROTECTED:
-            if key in text:
-                return f"夜間モードの設定や安全装置に触れるコマンド({key})"
-    if _WORKOPS_NIGHT.search(norm):
-        return "夜間モードの開始・終了コマンド(workops night)"
-    for seg in split_segments(cmd):
-        reason = _check_tokens(_tokens(seg), depth)
+    reason = check_tamper(cmd, segments)
+    if reason:
+        return reason
+    if _GIT_ENV.search(norm):
+        return "git の設定を環境変数で上書きするコマンド(GIT_CONFIG* など)"
+    token_lists = [_tokens(seg) for seg in segments]
+    reason = _check_indirection([w for toks in token_lists for w in toks], norm)
+    if reason:
+        return reason
+    for toks in token_lists:
+        reason = _check_tokens(toks, depth)
         if reason:
             return reason
     if re.search(r"\b(?:python[\d.]*|node|perl|ruby|php)\b[^\n]*(?:\s-[cer]\b|<<)", cmd) and _INLINE_PUSH.search(norm):

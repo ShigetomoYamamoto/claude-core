@@ -57,8 +57,11 @@ def check_file(path, marker, home, cwd=None):
     real = os.path.realpath(p)
     if real == os.path.realpath(marker):
         return "夜間モードのマーカーファイルの編集"
-    if re.search(r"/\.claude/settings(?:\.local)?\.json$", real):
-        return "Claude Code の設定ファイル(settings.json / settings.local.json)の編集"
+    for cand in (os.path.normpath(p), real):
+        if re.search(r"/\.claude/settings[^/]*\.json$", cand):
+            return "Claude Code の設定ファイル(.claude/settings*.json)の編集"
+        if "/.claude/hooks/" in cand + "/":
+            return ".claude/hooks/ 配下の安全装置の編集"
     if real.startswith(os.path.realpath(os.path.join(home, ".claude", "hooks")) + os.sep):
         return "~/.claude/hooks/ 配下の安全装置の編集"
     return None

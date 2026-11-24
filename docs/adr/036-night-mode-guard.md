@@ -26,11 +26,13 @@
 ### 夜間モード中に止めるもの（終了コード 2、理由は日本語で stderr）
 
 - Bash:
-  - `git push`、`git send-email`（`git -C x push`・`g"it" push`・`\git push`・`sudo`/`env` 越し・`sh -c`/`eval` の中・`&&` `;` `|` `$( )` の後ろも含む）。
+  - git は既定で止める。通すのはローカル・読み取りのサブコマンドだけ: add・commit・status・log・diff・show・branch・checkout・switch・restore・reset・rev-parse・worktree・merge・rebase・cherry-pick・tag・fetch・pull・ls-files・grep・blame・init・clone・describe・shortlog・reflog・stash、`config` は `--get`/`--get-all`/`--list`/`-l` のときだけ。push・send-email・別名（`git p` など）・未知のサブコマンド・`git config` の書き込みは止める。`git -c ...`（別名や外部コマンドの経路になる）と `--config-env` も止める。`GIT_CONFIG*`・`GIT_SSH_COMMAND`・`GIT_EXTERNAL_DIFF` の環境変数での上書きも止める。`rebase --exec` の中身は再帰して確認する。`fetch`/`pull`/`clone` の `--upload-pack`・`ext::` も止める。
+  - `g"it" push`・`\git push`・`git -C x push`・`sudo`/`env` 越し・`sh -c`/`eval` の中・`&&` `;` `|` `$( )` の後ろも同じ形に直して判定する。入れ子の深さの上限を超えたら、通さずに止める。`sh -c -- '...'` のように `--` があっても `-c` の中身を取り出す。
+  - 間接実行: コマンド内に git か gh が現れるとき、`xargs`・`parallel`・`find -exec/-execdir/-ok/-okdir` は止める（何を渡すか追えないため）。標準入力からスクリプトを読むシェル（`... | sh`・`bash -s`・`bash < file`・`bash <<EOF`・`bash /dev/stdin`）も止める。スクリプトファイルの実行（`bash scripts/test.sh`）は通す（限界を参照）。
   - `gh` は既定で止める。通すのは読み取りだけ: `pr view|list|status|diff|checks`、`issue view|list|status`、`run view|list|watch`、`workflow view|list`、`release view|list|download`、`repo view|clone`、`auth status`、`search`、`api`（GET のみで、`-f/-F/--field/--raw-field/--input` なし）。
-  - 文字列に `night-mode` を含むコマンド、`workops ... night start|end`、`.claude/settings.json`・`.claude/settings.local.json`・`.claude/hooks/` に触れるコマンド（安全装置を外から外させないため）。
-  - ローカルの git（commit・add・branch・checkout・switch・status・log・diff・worktree）、テスト、ビルド、読み取りは通す。
-- Edit / Write / MultiEdit / NotebookEdit: 対象がマーカー、`.claude/settings.json`、`.claude/settings.local.json`、`~/.claude/hooks/` 配下のとき。パスは `~` 展開・相対パス解決・シンボリックリンク解決のあとで比べる。
+  - マーカー・設定・hook の改ざん: `night-mode`・`night_mode`・`nightmode` を含むコマンド（クォートとバックスラッシュを除いた形でも見る）、`workops ... night start|end`、`.claude/settings*`・`.claude/hooks` に触れるコマンドを止める。さらに、`.claude` を含むコマンドで、変更系の語（rm・mv・cp・ln・find・tee・truncate・chmod・chflags・install・rsync・`sed -i`・`perl -i` など）かリダイレクト（`>`・`>>`。`2>&1` と `/dev/null` は除く）があれば止める。`.claude` やマーカーに当たりうるワイルドカード（`night*`・`*mode.json`・`.cl*`）も止める。
+  - ローカルの git、テスト、ビルド、読み取りは通す。
+- Edit / Write / MultiEdit / NotebookEdit: 対象がマーカー、どのディレクトリの `.claude/settings*.json`、どのディレクトリの `.claude/hooks/` 配下のとき（プロジェクトの `.claude` も含む）。パスは `~` 展開・相対パス解決・シンボリックリンク解決のあとで比べる。
 - MCP（`mcp__*`）: コネクタの名前空間は UUID で変わるため、最後の `__` より後ろの道具名で見る。
   - ローカルのサーバ（`unityMCP*`・`ccd_*`・`visualize`・`Claude_Code_iOS_Simulator`・`scheduled-tasks`）は通す。ただし `ccd_session` の `move_to_cloud` と、`target` が `cloud`/`ssh` の `start_session`、`ccd_pr` の `set_auto_merge` は止める。
   - それ以外は、道具名が読み取りの動詞（get・list・read・search・fetch・query・view・find・retrieve・download・whoami・describe）で始まるときだけ通す。先頭が `slack`・`notion`・`api`・`gmail`・`calendar`・`drive`・`browser` のときは、2語目で見る。`API-post-search` だけは名前に post を含むが検索なので明示的に通す。
@@ -66,15 +68,22 @@
 ### Positive
 
 - 夜は、push・PR・外への書き込みが、指示に頼らず物理的に止まる。
-- マーカーが無いときの追加コストは、Python の起動時間にほぼ収まる（20 回の平均で、素の `python3 -c pass` と差が測れなかった）。
+- マーカーが無いときの追加コストは、Python の起動時間にほぼ収まる（20 回の平均で、素の `python3 -c pass` は 27.9 ms、マーカー無しは 27.9 ms で差が測れなかった。ON のときの Bash 判定は約 34 ms）。
 
 ### Negative / 限界
 
-- コマンド文字列を見る検査であり、網は意図的に不完全（ADR-028）。例: `curl` での webhook への POST、インタプリタの中に隠した処理（`python3 -c` 内の push などは単純な文字列の近似でしか見ない）、git の alias、別名にした `gh` は止められない。
+- コマンド文字列を見る検査であり、網は意図的に不完全（ADR-028）。止められないもの:
+  - スクリプトファイルの中身。`bash scripts/test.sh` は通す（テストやビルドを夜も動かすため）。その中に `git push` が書かれていても見ない。
+  - インタプリタの中に隠した処理。`python3 -c` から subprocess で `git push` を呼ぶ、`node -e`、ファイルに書いた Python など。単純な文字列の近似でしか見ない。
+  - ネットワーク道具での外部書き込み。`curl` での POST・webhook 呼び出し、`nc` など。
+  - 変数や文字列の組み立てで作った語（`$X` に `git` を入れる、`.cl$Yaude` など）。
+  - 別名にした `gh`（シンボリックリンクなど）。
+- 止めすぎる例: `.claude` を含むコマンドに `install` や `>` が入っていれば、読み取りのつもりでも止まる。夜の作業の `git commit -m` に `night-mode` と書いても止まる。意図的な安全側の倒し方で、別の書き方（Read ツール、言い換え）で避ける。
+- 強い保証が要るなら、エージェントが書けないマーカーが要る（root 所有のファイルなど）。それには管理者権限のある人間の作業が要る。この hook は、その代わりの「うっかりと、よくある抜け道」を塞ぐ層。
 - MCP の判定は、道具名の動詞による見立てで、確実ではない。読み取りに見える名前で書き込む道具、書き込みに見える名前の読み取り道具があると外れる。新しいコネクタは、夜は読み取りだけが通る側に倒れる（通らなければ昼にやる）。
 - 夜間モード中は、Notion の記録や Slack の連絡も止まる。夜の作業の報告は、ローカルの作業ブランチとログに残し、朝に人間が出す。
 
 ### 運用上の影響
 
 - `settings-fragment.json` に PreToolUse の項目を1つ足す。反映には `python3 install.py`（update）の再実行が必要（ADR-023）。配線は ADR-031 の所有 hook の入れ替えで他ツールの項目を残したまま入る。
-- ヘルパは `hooks/_night_mode_policy.py`（マーカーの判定・ファイル・MCP）と `hooks/_night_mode_bash.py`（Bash）。
+- ヘルパは `hooks/_night_mode_policy.py`（マーカーの判定・ファイル・MCP）、`hooks/_night_mode_bash.py`（Bash の git・gh・シェル・間接実行）、`hooks/_night_mode_tamper.py`（マーカー・設定・hook の改ざん検出）。
