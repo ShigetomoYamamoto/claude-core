@@ -13,6 +13,9 @@ ALLOWED = {"add", "commit", "status", "log", "diff", "show", "branch", "checkout
            "merge-base", "ls-remote", "cat-file", "diff-tree", "show-ref", "for-each-ref", "name-rev",
            "symbolic-ref", "bisect", "remote"}
 _CONFIG_READ = {"--get", "--get-all", "--list", "-l"}
+# `git config <key>`(オペランド1つ)は読み取り。付けてよいのはこの無害なオプションだけ(--unset などは含めない)。
+_CONFIG_SAFE_OPTS = {"--global", "--local", "--system", "--worktree", "--show-origin", "--show-scope", "-z",
+                     "--null", "--bool", "--int", "--path", "--bool-or-int"}
 # 長いオプションは、他と紛れない前置きだけでも通じる(--upl = --upload-pack)。危険な名前の前置きは同じ扱いにする。
 _DANGEROUS_LONG = ("template", "upload-pack", "receive-pack")
 _GH_READ = {
@@ -75,6 +78,11 @@ def _check_sub_args(sub, rest):
     return None
 
 
+def _is_config_read(rest):
+    operands = [a for a in rest if not a.startswith("-")]
+    return len(operands) == 1 and all(a in _CONFIG_SAFE_OPTS for a in rest if a.startswith("-"))
+
+
 def check_git(args):
     sub, rest, config = _git_sub(args)
     if config:
@@ -83,7 +91,7 @@ def check_git(args):
         return None
     if sub not in ALLOWED:
         return f"git {sub}(夜間モードで通すのはローカルの git だけ)"
-    if sub == "config" and not (_CONFIG_READ & set(rest)):
+    if sub == "config" and not (_CONFIG_READ & set(rest)) and not _is_config_read(rest):
         return "git config の書き込み"
     if sub == "remote" and not (rest == [] or rest == ["-v"] or rest[0] in ("show", "get-url")):
         return "git remote の変更"

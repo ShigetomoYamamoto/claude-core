@@ -17,13 +17,13 @@ _LOCAL_SERVERS = {"ccd_session_mgmt", "ccd_turn", "ccd_view", "ccd_sidebar", "cc
 _UNITY_SERVER = re.compile(r"unityMCP(?:-[\w.]+)?")
 _SERVICE_PREFIXES = {"slack", "notion", "api", "gmail", "calendar", "drive", "browser"}
 _READ_VERBS = {"get", "list", "read", "search", "fetch", "query", "view", "find", "retrieve",
-               "download", "whoami", "describe"}
+               "download", "whoami", "describe", "snapshot", "inspect", "resolve"}
 # 先頭が読み取り語でも、こちらが1語でも含まれれば書き込みとみなす(例: get_or_create)。
 _WRITE_VERBS = {"create", "update", "delete", "send", "post", "patch", "write", "move", "trash", "share",
                 "modify", "append", "add", "remove", "set", "push", "merge", "forward", "reply",
                 "schedule", "put", "upload", "edit", "insert", "run", "execute", "navigate", "click",
-                "duplicate", "restore", "archive", "publish", "invite"}
-_EXPLICIT_READ = {"API-post-search"}
+                "duplicate", "restore", "archive", "publish", "invite", "mark", "dismiss"}
+_EXPLICIT_READ = {"api-post-search"}
 
 
 def is_night_on(text, now):
@@ -72,13 +72,14 @@ def check_file(path, marker, home, cwd=None):
 
 
 def _is_read_name(base):
-    if base in _EXPLICIT_READ:
+    if base.lower() in _EXPLICIT_READ:
         return True
     toks = [t for t in re.split(r"[-_]", base.lower()) if t]
     if not toks or _WRITE_VERBS & set(toks):
         return False
     idx = 1 if toks[0] in _SERVICE_PREFIXES and len(toks) > 1 else 0
-    return toks[idx] in _READ_VERBS
+    # 先頭が読み取りの動詞、または最後の語が読み取りの動詞(pull_request_read・issue_read)なら読み取り。
+    return toks[idx] in _READ_VERBS or toks[-1] in _READ_VERBS
 
 
 def check_mcp(tool_name, tool_input):

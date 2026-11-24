@@ -30,12 +30,8 @@ _REDIR_OP = re.compile(r"\d*(?:<<<|<<-?|<>|<|>>|>\|?|&>)")
 _REDIR_ATTACHED = re.compile(r"\d*(?:<<<|<<-?|<|>>|>)\S+")
 # 網: 先頭のプログラムに関係なく、語の並びだけで見る(python -c・node -e・osascript・未知のラッパーも)。
 _CATCH_GIT = re.compile(r"\bgit\b.*\b(?:push|send-email)\b", re.S)
-_CATCH_GH = re.compile(
-    r"\bgh\b.*\b(?:pr[^\w-]+(?:create|merge|review|comment|edit|close|reopen|ready)"
-    r"|issue[^\w-]+(?:create|comment|edit|close)|release[^\w-]+(?:create|edit|delete|upload)"
-    r"|repo[^\w-]+(?:create|fork|delete|edit)|workflow[^\w-]+run)\b", re.S)
-_CATCH_GH_API = re.compile(r"\bgh\b.*\bapi\b", re.S)
-_CATCH_API_WRITE = re.compile(r"(?<![\w-])(?:(?:-x|--method)[=\s]*(?:post|put|patch|delete)\b|-f|--field|--raw-field|--input)")
+_GH_WORD = re.compile(r"(?<![\w-])gh(?![\w-])", re.I)
+_GH_SPLIT = re.compile(r"[\s,\[\]()]+")
 _WORD_SPLIT = re.compile(r"[\s;|&()`<>=]+")
 
 
@@ -91,10 +87,17 @@ def _check_catch_all(norm):
     text = norm.casefold()
     if _CATCH_GIT.search(text):
         return "git push / send-email の語を含むコマンド(インタプリタや未知のラッパー経由も止める)"
-    if _CATCH_GH.search(text):
-        return "gh の書き込み形の語を含むコマンド"
-    if _CATCH_GH_API.search(text) and _CATCH_API_WRITE.search(text):
-        return "gh api の書き込み形の語を含むコマンド"
+    return _check_gh_anywhere(norm)
+
+
+def _check_gh_anywhere(norm):
+    """`gh` の語の後ろにサブコマンドの語があれば、読み取りの許可リストに合わない限り止める(deny unless read)。"""
+    for m in _GH_WORD.finditer(norm):
+        words = [w for w in _GH_SPLIT.split(norm[m.end():]) if w]
+        words = [w if w.startswith("-") else w.casefold() for w in words]
+        reason = check_gh(words)
+        if reason:
+            return f"{reason}(コマンドのどこかに gh がある場合は、読み取り以外を止める)"
     return None
 
 

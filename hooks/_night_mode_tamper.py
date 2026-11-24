@@ -95,8 +95,15 @@ def _neutralize_worktrees(text, home):
 
     ただしホームの .claude(`~/`・`$HOME/`・`${HOME}/`・ホームの絶対パス)の下は数える。
     """
-    pat = re.compile(r"((?:~|\$\{?home\}?|%s)/)?\.claude/worktrees/" % re.escape(home.casefold()))
-    return pat.sub(lambda m: m.group(0) if m.group(1) else ".wt/", text)
+    pat = re.compile(r"((?:~|\$\{?home\}?|%s)/)?\.claude/worktrees/([^\s;|&()`<>\"']*)" % re.escape(home.casefold()))
+
+    def repl(m):
+        # ホームの下、または `..` で外へ出られる形は、作業ツリー置き場として扱わない。
+        if m.group(1) or ".." in m.group(2).split("/"):
+            return m.group(0)
+        return ".wt/" + m.group(2)
+
+    return pat.sub(repl, text)
 
 
 def cwd_in_claude(cwd, home):
@@ -115,8 +122,9 @@ def cwd_in_claude(cwd, home):
 def check_tamper(cmd, segments, cwd=None, home=None):
     """止めるべきなら理由を、通してよければ None を返す。segments は区切り済みのコマンド列。"""
     home = home or os.path.expanduser("~")
-    cmd = _neutralize_worktrees(cmd.casefold(), home)  # macOS の既定のファイルシステムは大文字小文字を区別しない
-    squeezed = _neutralize_worktrees(_squeeze(cmd), home)
+    orig = cmd.casefold()  # macOS の既定のファイルシステムは大文字小文字を区別しない
+    cmd = _neutralize_worktrees(orig, home)
+    squeezed = _neutralize_worktrees(_squeeze(orig), home)  # クォートを外す前の元の文字列から作る
     for text in (cmd, squeezed):
         if _NIGHT.search(text):
             return "夜間モードのマーカーや開始・終了コマンドに触れる語(night-mode)"

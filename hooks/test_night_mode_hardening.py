@@ -84,6 +84,20 @@ CATCH_ALL_BLOCKED = [
     "fish", "caffeinate sh", "echo x | tcsh", "caffeinate git frobnicate",
 ]
 
+GH_DENY_UNLESS_READ = [
+    "python3 -c \"print('gh', 'gist', 'create')\"", "x gh gist create f", "x gh secret set A", "x gh variable set A",
+    "x gh label create l", "x gh run rerun 5", "x gh run cancel 5", "x gh run delete 5", "x gh repo sync", "x gh repo rename n",
+    "x gh repo archive", "x gh pr", "x gh codespace create", "x gh extension install x", "x gh alias set a b",
+    "x gh ssh-key add k", "x gh cache delete 1", "echo gh is great", "x GH GIST CREATE",
+    "subprocess.run(['gh','pr','create'])", "x gh -R o/r pr create",
+]
+
+GH_READ_ALLOWED = [
+    "x gh pr view 3", "x gh pr list", "x gh issue view 3", "x gh run watch 5", "x gh -R o/r pr view 3", "x gh api repos/o/r",
+    "x gh api -X GET repos/o/r", "x gh search issues foo", "x gh release download v1", "x gh repo view", "x gh auth status",
+    "x gh workflow list", "x gh pr checks 3", "x gh --version", "git log --grep gh",
+]
+
 CATCH_ALL_ALLOWED = ["env -S 'ls -l'", "caffeinate pnpm test", "watch ls", "arch -arm64 pnpm test", "flock l pnpm test",
                      "fish scripts/t.fish", "gh api repos/o/r/pulls", "gh pr view 3", "env A=1 ls"]
 
@@ -113,6 +127,10 @@ TAMPER_BLOCKED = [
     "echo x > ~/.CLAUDE/settings.json", "rm ~/.Claude/x", "RM ~/.claude/x", "cd ~/.claude && rm n*", "echo {} > .claude/settings.local.json", "rm $HOME/.claude/x",
     "rm ${HOME}/.claude/worktrees/x", "rm ~/.claude/worktrees/x", "rm -rf .claude/worktrees", "rm .claude",
     "rm .claude/worktrees/w/.claude/hooks/x", "rm .claude/worktrees/w/.claude/settings.json", "rm .claude/rules/x.md",
+    "rm .claude/worktrees/../settings.json", "echo x > ~/.claude/worktrees/../night-mode.json",
+    "rm .claude/worktrees/x/../../settings.json", "echo x > .claude/worktrees/..", "rm .claude/worktrees/x/..",
+    "echo x > .claude/worktrees/x/../x/../../hooks/a", "rm .claude/worktrees/\"..\"/x", "rm .claude/worktrees/../x",
+    "cp a .claude/worktrees/w/../../rules/b",
     "rm .claude/worktrees/w/night-mode.json", "cd .claude && rm x", "rm /r/.claude/", "cat ~/.CLAUDE/NIGHT-MODE.JSON",
     "ls ~/.CLAUDE/HOOKS/", "rm ~/.CLAUDE/NIGHT*",
     "echo x > repo/.git/config", "rm repo/.git/hooks/pre-push", "cp x .git/hooks/pre-commit", "tee .git/info/exclude",
@@ -160,6 +178,17 @@ class BashTables(unittest.TestCase):
 
     def test_catch_all_blocked(self):
         self.check(CATCH_ALL_BLOCKED, True)
+
+    def test_gh_deny_unless_read(self):
+        self.check(GH_DENY_UNLESS_READ, True)
+        self.check(GH_READ_ALLOWED, False)
+
+    def test_git_config_single_operand_is_read(self):
+        self.check(["git config user.name", "git config --global user.name", "git config --local core.editor",
+                    "git config --show-origin user.email"], False)
+        self.check(["git config user.name x", "git config --unset user.name", "git config --unset-all x",
+                    "git config --add a b", "git config --edit", "git config -e", "git config --replace-all a b",
+                    "git config --global --remove-section x", "git config --uns user.name", "git config"], True)
 
     def test_catch_all_allowed(self):
         self.check(CATCH_ALL_ALLOWED, False)
