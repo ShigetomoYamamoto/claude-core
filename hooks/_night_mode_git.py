@@ -78,9 +78,24 @@ def _check_sub_args(sub, rest):
     return None
 
 
+_CONFIG_SUBCOMMANDS = {"edit", "set", "unset", "rename-section", "remove-section", "get", "get-color",
+                       "get-colorbool", "list"}
+
+
+def _is_config_key(arg):
+    return "." in arg and not arg.startswith("-") and arg not in _CONFIG_SUBCOMMANDS
+
+
 def _is_config_read(rest):
+    """読み取りの形: `config <key>`、`config list`、`config get <key>`。subcommand 名やキーらしくない語は書き込み扱い。"""
+    if not all(a in _CONFIG_SAFE_OPTS for a in rest if a.startswith("-")):
+        return False
     operands = [a for a in rest if not a.startswith("-")]
-    return len(operands) == 1 and all(a in _CONFIG_SAFE_OPTS for a in rest if a.startswith("-"))
+    if operands == ["list"]:
+        return True
+    if len(operands) == 2 and operands[0] == "get":
+        return _is_config_key(operands[1])
+    return len(operands) == 1 and _is_config_key(operands[0])
 
 
 def check_git(args):
