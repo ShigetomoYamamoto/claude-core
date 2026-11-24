@@ -55,14 +55,16 @@ def check_file(path, marker, home, cwd=None):
     if not os.path.isabs(p):
         p = os.path.join(cwd or os.getcwd(), p)
     real = os.path.realpath(p)
-    if real == os.path.realpath(marker):
+    if real.casefold() == os.path.realpath(marker).casefold():
         return "夜間モードのマーカーファイルの編集"
-    for cand in (os.path.normpath(p), real):
+    for cand in (os.path.normpath(p).casefold(), real.casefold()):
+        if re.search(r"/\.git/(?:worktrees/[^/]+/)?(?:config(?:\.worktree)?$|hooks/|info/)", cand):
+            return ".git/config・hooks・info の編集(git に任意のコマンドを走らせうるため)"
         if re.search(r"/\.claude/settings[^/]*\.json$", cand):
             return "Claude Code の設定ファイル(.claude/settings*.json)の編集"
         if "/.claude/hooks/" in cand + "/":
             return ".claude/hooks/ 配下の安全装置の編集"
-    if real.startswith(os.path.realpath(os.path.join(home, ".claude", "hooks")) + os.sep):
+    if real.casefold().startswith(os.path.realpath(os.path.join(home, ".claude", "hooks")).casefold() + os.sep):
         return "~/.claude/hooks/ 配下の安全装置の編集"
     return None
 

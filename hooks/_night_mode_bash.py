@@ -22,7 +22,7 @@ _GIT_ALLOWED = {"add", "commit", "status", "log", "diff", "show", "branch", "che
                 "ls-files", "grep", "blame", "init", "clone", "describe", "shortlog", "reflog", "stash",
                 "config"}
 _GIT_CONFIG_READ = {"--get", "--get-all", "--list", "-l"}
-_GIT_ENV = re.compile(r"\bGIT_(?:CONFIG\w*|SSH_COMMAND|EXTERNAL_DIFF)=")
+_GIT_ENV = re.compile(r"(?<![\w])(?:GIT_\w*|EDITOR|VISUAL|SSH_ASKPASS)=")
 _GIT_TOKEN = re.compile(r"(?<![\w])(?:git|gh)(?![\w])")
 _MAX_DEPTH = 3
 _GH_READ = {
@@ -105,15 +105,12 @@ def _check_git(args, depth):
         return f"git {sub}(夜間モードで通すのはローカルの git だけ)"
     if sub == "config" and not (_GIT_CONFIG_READ & set(rest)):
         return "git config の書き込み"
-    if sub == "rebase":
-        for k, a in enumerate(rest):
-            if a in ("-x", "--exec") and k + 1 < len(rest):
-                return check_bash(rest[k + 1], depth + 1)
-            if a.startswith("--exec="):
-                return check_bash(a[7:], depth + 1)
-    if sub in ("fetch", "pull", "clone") and any(
-            a.startswith(("--upload-pack", "--receive-pack", "ext::")) or a == "-u" for a in rest):
-        return f"git {sub}(外部コマンドを走らせる指定)"
+    if sub == "rebase" and any(a.startswith(("-x", "--ex")) for a in rest):
+        return "git rebase --exec(任意のコマンドを走らせるため。中身は確認しない)"
+    for a in rest:
+        if (a == "-c" or re.match(r"-c.+=", a) or a.startswith(("--conf", "--template", "--upl", "--rec"))
+                or "ext::" in a or (a == "-u" and sub in ("fetch", "pull", "clone"))):
+            return f"git {sub} の設定上書き・外部コマンドを走らせる指定({a})"
     return None
 
 
@@ -162,6 +159,10 @@ def _shell_script_reason(toks, depth):
     i = 0
     while i < len(args):
         a = args[i]
+        if a in ("-o", "+o", "-O", "+O", "--rcfile", "--init-file"):
+            i += 2; continue
+        if a.startswith(("--rcfile=", "--init-file=")):
+            i += 1; continue
         if re.fullmatch(r"-[a-zA-Z]*c[a-zA-Z]*", a) and script is None and not has_c:
             has_c = True
             j = i + 1
@@ -178,7 +179,7 @@ def _shell_script_reason(toks, depth):
             stdin_s = True
         if a == "-":
             stdin_s = True
-        elif not a.startswith("-"):
+        elif not a.startswith(("-", "+")):
             files.append(a)
         i += 1
     if has_c:
@@ -197,10 +198,10 @@ def _check_tokens(toks, depth):
         return None
     if depth > _MAX_DEPTH:
         return "コマンドの入れ子が深すぎて中身を確認できない"
-    prog = _base(toks[0])
+    prog = _base(toks[0]).casefold()
     if prog in _WRAPPERS:
         for k in range(1, len(toks)):
-            if _base(toks[k]) in _GIT_LIKE:
+            if _base(toks[k]).casefold() in _GIT_LIKE:
                 return _check_tokens(toks[k:], depth + 1)
         return None
     if prog in ("git-send-email",):

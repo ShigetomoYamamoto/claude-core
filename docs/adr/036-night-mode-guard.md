@@ -26,13 +26,13 @@
 ### 夜間モード中に止めるもの（終了コード 2、理由は日本語で stderr）
 
 - Bash:
-  - git は既定で止める。通すのはローカル・読み取りのサブコマンドだけ: add・commit・status・log・diff・show・branch・checkout・switch・restore・reset・rev-parse・worktree・merge・rebase・cherry-pick・tag・fetch・pull・ls-files・grep・blame・init・clone・describe・shortlog・reflog・stash、`config` は `--get`/`--get-all`/`--list`/`-l` のときだけ。push・send-email・別名（`git p` など）・未知のサブコマンド・`git config` の書き込みは止める。`git -c ...`（別名や外部コマンドの経路になる）と `--config-env` も止める。`GIT_CONFIG*`・`GIT_SSH_COMMAND`・`GIT_EXTERNAL_DIFF` の環境変数での上書きも止める。`rebase --exec` の中身は再帰して確認する。`fetch`/`pull`/`clone` の `--upload-pack`・`ext::` も止める。
-  - `g"it" push`・`\git push`・`git -C x push`・`sudo`/`env` 越し・`sh -c`/`eval` の中・`&&` `;` `|` `$( )` の後ろも同じ形に直して判定する。入れ子の深さの上限を超えたら、通さずに止める。`sh -c -- '...'` のように `--` があっても `-c` の中身を取り出す。
+  - git は既定で止める。通すのはローカル・読み取りのサブコマンドだけ: add・commit・status・log・diff・show・branch・checkout・switch・restore・reset・rev-parse・worktree・merge・rebase・cherry-pick・tag・fetch・pull・ls-files・grep・blame・init・clone・describe・shortlog・reflog・stash、`config` は `--get`/`--get-all`/`--list`/`-l` のときだけ。push・send-email・別名（`git p` など）・未知のサブコマンド・`git config` の書き込みは止める。許可したサブコマンドの引数にも、設定の上書きや外部コマンドの指定（`-c`・`-cK=V`・`--config*`・`--config-env`・`--template`・`--upload-pack`・`--receive-pack`・`ext::`、fetch/pull/clone の `-u`）があれば止める。`rebase` の `-x`/`--exec`（短縮形・値をくっつけた形を含む）は中身を見ずに止める。コマンド内に `GIT_*`・`EDITOR`・`VISUAL`・`SSH_ASKPASS` の代入があれば止める（`env VAR=... git` や `export` も含む）。
+  - `g"it" push`・`\git push`・`git -C x push`・`sudo`/`env` 越し・`sh -c`/`eval` の中・`&&` `;` `|` `$( )` の後ろも同じ形に直して判定する。入れ子の深さの上限を超えたら、通さずに止める。`sh -c -- '...'` のように `--` があっても `-c` の中身を取り出す。シェルは `-o`/`+o`/`-O`/`+O`/`--rcfile`/`--init-file` の値を飛ばしてスクリプトの引数を探し、実行するファイルがはっきりしなければ止める。大文字小文字は区別せずに比べる（macOS の既定のファイルシステムのため）。
   - 間接実行: コマンド内に git か gh が現れるとき、`xargs`・`parallel`・`find -exec/-execdir/-ok/-okdir` は止める（何を渡すか追えないため）。標準入力からスクリプトを読むシェル（`... | sh`・`bash -s`・`bash < file`・`bash <<EOF`・`bash /dev/stdin`）も止める。スクリプトファイルの実行（`bash scripts/test.sh`）は通す（限界を参照）。
   - `gh` は既定で止める。通すのは読み取りだけ: `pr view|list|status|diff|checks`、`issue view|list|status`、`run view|list|watch`、`workflow view|list`、`release view|list|download`、`repo view|clone`、`auth status`、`search`、`api`（GET のみで、`-f/-F/--field/--raw-field/--input` なし）。
-  - マーカー・設定・hook の改ざん: `night-mode`・`night_mode`・`nightmode` を含むコマンド（クォートとバックスラッシュを除いた形でも見る）、`workops ... night start|end`、`.claude/settings*`・`.claude/hooks` に触れるコマンドを止める。さらに、`.claude` を含むコマンドで、変更系の語（rm・mv・cp・ln・find・tee・truncate・chmod・chflags・install・rsync・`sed -i`・`perl -i` など）かリダイレクト（`>`・`>>`。`2>&1` と `/dev/null` は除く）があれば止める。`.claude` やマーカーに当たりうるワイルドカード（`night*`・`*mode.json`・`.cl*`）も止める。
+  - マーカー・設定・hook の改ざん: `night-mode`・`night_mode`・`nightmode` を含むコマンド（クォートとバックスラッシュを除いた形でも見る）、`workops ... night start|end`、`.claude/settings*`・`.claude/hooks` に触れるコマンドを止める。さらに、`.claude` を含むコマンドで、変更系の語（rm・mv・cp・ln・find・tee・truncate・chmod・chflags・install・rsync・`sed -i`・`perl -i` など）かリダイレクト（`>`・`>>`。`2>&1` と `/dev/null` は除く）があれば止める。`.claude` やマーカーに当たりうるワイルドカード（`night*`・`*mode.json`・`.cl*`）も止める。`.git/config`・`.git/hooks/*`・`.git/info/*`（worktree 側を含む）を書き換えるコマンド（変更系の語かリダイレクト）も止める。
   - ローカルの git、テスト、ビルド、読み取りは通す。
-- Edit / Write / MultiEdit / NotebookEdit: 対象がマーカー、どのディレクトリの `.claude/settings*.json`、どのディレクトリの `.claude/hooks/` 配下のとき（プロジェクトの `.claude` も含む）。パスは `~` 展開・相対パス解決・シンボリックリンク解決のあとで比べる。
+- Edit / Write / MultiEdit / NotebookEdit: 対象がマーカー、どのディレクトリの `.claude/settings*.json`、どのディレクトリの `.claude/hooks/` 配下（プロジェクトの `.claude` も含む）、`.git/config`・`.git/hooks/*`・`.git/info/*` のとき。パスは `~` 展開・相対パス解決・シンボリックリンク解決のあとで比べる。
 - MCP（`mcp__*`）: コネクタの名前空間は UUID で変わるため、最後の `__` より後ろの道具名で見る。
   - ローカルのサーバ（`unityMCP*`・`ccd_*`・`visualize`・`Claude_Code_iOS_Simulator`・`scheduled-tasks`）は通す。ただし `ccd_session` の `move_to_cloud` と、`target` が `cloud`/`ssh` の `start_session`、`ccd_pr` の `set_auto_merge` は止める。
   - それ以外は、道具名が読み取りの動詞（get・list・read・search・fetch・query・view・find・retrieve・download・whoami・describe）で始まるときだけ通す。先頭が `slack`・`notion`・`api`・`gmail`・`calendar`・`drive`・`browser` のときは、2語目で見る。`API-post-search` だけは名前に post を含むが検索なので明示的に通す。
@@ -68,7 +68,7 @@
 ### Positive
 
 - 夜は、push・PR・外への書き込みが、指示に頼らず物理的に止まる。
-- マーカーが無いときの追加コストは、Python の起動時間にほぼ収まる（20 回の平均で、素の `python3 -c pass` は 27.9 ms、マーカー無しは 27.9 ms で差が測れなかった。ON のときの Bash 判定は約 34 ms）。
+- マーカーが無いときの追加コストは、Python の起動時間にほぼ収まる（20 回の平均で、素の `python3 -c pass` は 27.9 ms、マーカー無しは 27.9 ms(再測定: 43.1 ms と 43.5 ms) で差が測れなかった。ON のときの Bash 判定は約 34 ms(再測定で +4 ms)）。
 
 ### Negative / 限界
 
@@ -77,9 +77,11 @@
   - インタプリタの中に隠した処理。`python3 -c` から subprocess で `git push` を呼ぶ、`node -e`、ファイルに書いた Python など。単純な文字列の近似でしか見ない。
   - ネットワーク道具での外部書き込み。`curl` での POST・webhook 呼び出し、`nc` など。
   - 変数や文字列の組み立てで作った語（`$X` に `git` を入れる、`.cl$Yaude` など）。
-  - 別名にした `gh`（シンボリックリンクなど）。
-- 止めすぎる例: `.claude` を含むコマンドに `install` や `>` が入っていれば、読み取りのつもりでも止まる。夜の作業の `git commit -m` に `night-mode` と書いても止まる。意図的な安全側の倒し方で、別の書き方（Read ツール、言い換え）で避ける。
-- 強い保証が要るなら、エージェントが書けないマーカーが要る（root 所有のファイルなど）。それには管理者権限のある人間の作業が要る。この hook は、その代わりの「うっかりと、よくある抜け道」を塞ぐ層。
+  - 別名にした `gh`（シンボリックリンクなど）、`caffeinate git push` のように未知の先頭プログラムを挟んだ呼び出し。
+  - 1回目の呼び出しで `cd ~/.claude`、2回目で `rm n*` のように、呼び出しをまたいだ操作。`git -C ~/.claude stash -u` など、git 自身による `.claude` への書き込み。
+  - `GIT_EDITOR`・`GIT_PAGER` 以外の経路で、環境変数やファイルに仕込んだコマンド（設定ファイル・git の hook・エイリアスに前もって書かれたもの）。
+- 止めすぎる例: 許可リストにない git（`rm`・`mv`・`revert`・`apply`・`clean`・`remote -v`・`rev-list`・`merge-base`・`ls-remote`）。`git commit -c`・`git log -c`。`GIT_EDITOR=true git rebase --continue`。`.git` を含むパスの `find ... -exec` と `xargs`。`.claude/worktrees/` 配下の作業ツリーでの `rm`・`cp`・`mv`・`>`（`.claude` を含むパスのため）。 `.claude` を含むコマンドに `install` や `>` が入っていれば、読み取りのつもりでも止まる。夜の作業の `git commit -m` に `night-mode` と書いても止まる。意図的な安全側の倒し方で、別の書き方（Read ツール、言い換え）で避ける。
+- 強い保証が要るなら、エージェントが書けないマーカーが要る（root 所有のファイルなど）。それには管理者権限のある人間の作業が要る。このとおり、文字列の検査は網であり、これ以上の穴ふさぎは足さない（ADR-028）。この hook は、その代わりの「うっかりと、よくある抜け道」を塞ぐ層。
 - MCP の判定は、道具名の動詞による見立てで、確実ではない。読み取りに見える名前で書き込む道具、書き込みに見える名前の読み取り道具があると外れる。新しいコネクタは、夜は読み取りだけが通る側に倒れる（通らなければ昼にやる）。
 - 夜間モード中は、Notion の記録や Slack の連絡も止まる。夜の作業の報告は、ローカルの作業ブランチとログに残し、朝に人間が出す。
 

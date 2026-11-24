@@ -17,6 +17,8 @@ _INPLACE_PROGS = {"sed", "perl"}
 _INPLACE_FLAG = re.compile(r"-[a-zA-Z]*i|--in-place")
 _NOISE_REDIRECT = re.compile(r"\d*>>?\s*/dev/null|&>\s*/dev/null|\d*>&\d+-?")
 _GLOB_CHARS = re.compile(r"[*?\[]")
+# .git/config・.git/hooks/*・.git/info/*(worktree 側の gitdir も)。ここに書くと git が任意コマンドを走らせうる。
+_GIT_INTERNAL = re.compile(r"\.git/(?:worktrees/[^/\s]+/)?(?:config|hooks|info)(?![\w-])")
 
 
 def _squeeze(cmd):
@@ -58,7 +60,7 @@ def _words(segments):
 
 def _has_mutator(words):
     for k, w in enumerate(words):
-        base = w.rsplit("/", 1)[-1]
+        base = w.rsplit("/", 1)[-1].casefold()
         if base in _MUTATORS:
             return True
         if base in _INPLACE_PROGS and any(_INPLACE_FLAG.match(x) for x in words[k + 1:k + 8]):
@@ -88,6 +90,7 @@ def _glob_hits_claude_or_marker(squeezed):
 
 def check_tamper(cmd, segments):
     """止めるべきなら理由を、通してよければ None を返す。segments は区切り済みのコマンド列。"""
+    cmd = cmd.casefold()  # macOS の既定のファイルシステムは大文字小文字を区別しない
     squeezed = _squeeze(cmd)
     for text in (cmd, squeezed):
         if _NIGHT.search(text):
@@ -98,7 +101,7 @@ def check_tamper(cmd, segments):
             if key in text:
                 return f"夜間モードの設定や安全装置に触れるコマンド({key})"
     hits_dir, hits_marker = _glob_hits_claude_or_marker(squeezed)
-    mentions = ".claude" in cmd or ".claude" in squeezed or hits_dir
+    mentions = ".claude" in cmd or ".claude" in squeezed or hits_dir or bool(_GIT_INTERNAL.search(squeezed))
     if not mentions:
         return None
     if hits_marker:

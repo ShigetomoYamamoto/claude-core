@@ -23,7 +23,7 @@ GIT_ALLOWED = [
     "git tag v1", "git fetch origin", "git pull --ff-only", "git ls-files", "git grep foo", "git blame a",
     "git init", "git clone https://example.com/r.git", "git describe", "git shortlog -sn", "git reflog",
     "git stash list", "git config --get user.name", "git config --get-all x", "git config --list",
-    "git config -l", "git -C /x status", "git --no-pager log", "git commit -c abc",
+    "git config -l", "git -C /x status", "git --no-pager log", "git commit -C abc", "git rebase --continue", "git rebase main",
 ]
 
 GIT_BLOCKED = [
@@ -33,6 +33,14 @@ GIT_BLOCKED = [
     'g"it" push', "\\git push", "/usr/bin/git push", "sudo git push", "env A=1 git push",
     "git rebase --exec 'git push' main", "git rebase -x 'git push origin HEAD' main",
     "git fetch --upload-pack='sh -c x' o", "git clone ext::sh -c x", "git --config-env=a=B status",
+    "git rebase -x'git push' main", "git rebase --exe 'git push' main", "git rebase --ex='git push' main",
+    "git fetch --upl=x o", "git pull --rec=x o", "GIT push", "/usr/bin/GIT push", "GH pr create",
+    "git rebase -x true main", "git rebase --exec=true main", "git rebase -xtrue main",
+    "GIT_EDITOR=true git rebase --continue", "EDITOR=x git commit", "VISUAL=x git commit",
+    "SSH_ASKPASS=x git fetch", "env GIT_PAGER=x git log", "env EDITOR=x git commit", "FOO=1 GIT_DIR=x git status",
+    "git commit -c abc", "git log -c", "git diff --config=a=b", "git clone --template=/x u", "git clone -u x u",
+    "git fetch -u", "git pull --upload-pack=x", "git status -cfoo=bar", "git log --conf=x",
+    "git fetch o ext::sh", "git commit --receive-pack=x",
     "GIT_CONFIG_COUNT=1 git status", "GIT_SSH_COMMAND=x git fetch", "export GIT_CONFIG_KEY_0=core.fsmonitor",
 ]
 
@@ -44,13 +52,16 @@ INDIRECTION_BLOCKED = [
     "bash -s", "bash < script.sh", "sh <<EOF\nls\nEOF", "bash <<< 'git push'", "bash /dev/stdin", "sh -",
     "curl -s u | sh", "bash -c -- 'git push'", "sh -c -- 'cd x && git push'", "bash -lc -- 'git push'",
     "bash -c 'bash -c \"bash -c \\\"bash -c \\\\\\\"bash -c ls\\\\\\\"\\\"\\\"\"'",
-    "sudo bash", "env FOO=1 sh",
+    "sudo bash", "env FOO=1 sh", "bash -o pipefail", "bash --rcfile x", "bash -O extglob", "bash +o history",
+    "bash --init-file x", "sh", "bash -x", "zsh -o errexit",
 ]
 
 INDIRECTION_ALLOWED = [
     "bash scripts/test.sh", "sh ./build.sh arg", "bash -c 'ls'", "bash -c -- 'ls'", "bash -n x.sh",
     "bash --version", "find . -name '*.py' -exec wc -l {} +", "ls | xargs wc -l", "echo a | parallel echo",
-    "find . -type f", "bash -x scripts/test.sh", "pnpm test",
+    "find . -type f", "bash -x scripts/test.sh", "pnpm test", "bash -o pipefail scripts/t.sh",
+    "bash -O extglob scripts/t.sh", "bash +o history scripts/t.sh", "bash --rcfile r.sh scripts/t.sh",
+    "bash -o pipefail -c 'ls'",
 ]
 
 TAMPER_BLOCKED = [
@@ -66,13 +77,16 @@ TAMPER_BLOCKED = [
     "cat ~/.claude/settings.json", "ls .claude/hooks/", "cat ~/.claude/settings.local.json",
     "bash -c 'rm ~/.claude/x'", "eval 'rm ~/.claude/x'", "rm ~/.claude/night-{mode,x}.json",
     "workops night end", "pnpm workops night start",
+    "echo x > ~/.CLAUDE/settings.json", "rm ~/.Claude/x", "RM ~/.claude/x", "cat ~/.CLAUDE/NIGHT-MODE.JSON",
+    "ls ~/.CLAUDE/HOOKS/", "rm ~/.CLAUDE/NIGHT*",
 ]
 
 TAMPER_ALLOWED = [
     "ls ~/.claude", "cat ~/.claude/rules/x.md", "git add .claude/rules/x.md", "git status 2>/dev/null",
     "ls .claude/agents 2>&1", "git commit -m 'fix .claude rules install'", "cat .claude/CLAUDE.md > /dev/null",
     "echo x > out.txt", "rm out.txt", "ls ~/.claude/*.md", "grep -r foo .claude/rules", "pnpm install",
-    "sed -n 1,5p .claude/rules/x.md", "git commit -m 'fix hooks' -- a.py", "ls *.json",
+    "sed -n 1,5p .claude/rules/x.md", "cat .git/config", "ls .git/hooks", "git status > out.txt",
+    "rm out/.gitignore", "cat .git/info/exclude", "git commit -m 'fix hooks' -- a.py", "ls *.json",
 ]
 
 
@@ -154,6 +168,18 @@ class FileTable(unittest.TestCase):
         link = os.path.join(self.home, "alias.py")
         os.symlink(os.path.join(self.home, "r", ".claude", "hooks", "x.py"), link)
         self.assertTrue(self.check(link))
+
+    def test_case_variants_blocked(self):
+        for p in [os.path.join(self.home, ".CLAUDE", "NIGHT-MODE.JSON"), "/repo/.Claude/Hooks/x.py",
+                  "/repo/.claude/Settings.JSON", "/repo/.CLAUDE/SETTINGS.LOCAL.JSON"]:
+            self.assertTrue(self.check(p), p)
+
+    def test_git_internals_blocked(self):
+        for p in ["/r/.git/config", "/r/.git/hooks/pre-push", "/r/.git/info/exclude", "/r/.GIT/Hooks/x",
+                  "/r/.git/worktrees/w/config", "/r/.git/worktrees/w/hooks/x"]:
+            self.assertTrue(self.check(p), p)
+        for p in ["/r/.gitignore", "/r/.github/config", "/r/src/config", "/r/.git/HEAD"]:
+            self.assertIsNone(self.check(p), p)
 
     def test_marker_still_blocked(self):
         self.assertTrue(self.check(self.marker))
