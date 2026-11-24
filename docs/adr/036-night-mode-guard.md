@@ -1,0 +1,80 @@
+# ADR-036: 夜間モード中は、push・PR・外への書き込みを hook で止める
+
+**ステータス**: accepted
+
+**日付**: 2026-11-25
+
+**関連**: Notion ID47（夜の作業規則）、[ADR-006](./006-hook-error-policy.md)（hook の例外処理）、[ADR-028](./028-command-string-guard-limits.md)（文字列ガードの限界）、[ADR-031](./031-hook-merge-by-ownership.md)（配線のマージ）
+
+## コンテキスト
+
+- 夜の AI 作業の規則は次のとおり。夜の作業は、他の人から見えないところで終わらせる。ローカルの作業ブランチまでにして、push・PR・外への書き込み（Slack・Gmail・Notion・Calendar・Drive/Sheets/Docs・GitHub）はしない。
+- いまの止め手では足りない。`git-destructive-blocker` は保護ブランチへの push だけを見る。作業ブランチの push と PR 作成は止まらない。
+- DWAI-api は develop への push で自動デプロイされる。夜に誤って push すると、他の人に見える本番へ反映される。
+- 夜かどうかを人間が毎回指示するのは続かない。`~/.claude/night-mode.json`（マーカー）があれば夜間モード、という約束にして、止める側は hook に固定する。マーカーの書き手は work-agent 側（`workops night start|end`・ID46）。
+
+## 決定
+
+### マーカーの契約
+
+- パスは `~/.claude/night-mode.json`（プロセスの HOME から解決する）。本人以外が場所を差し替えられる環境変数は設けない（抜け道になるため）。
+- ファイルが無ければ OFF。hook は最初の検査でこれを見て、何も出さずに終了する。
+- ファイルがあるとき、読めない・JSON でない・オブジェクトでない・`until` が無い・`until` にタイムゾーンが無い・日時として読めない場合は ON（安全側）。
+- `until` が読めて、現在時刻が `until` より前なら ON。`until` 以降なら OFF（期限切れ。これが通常の自動解除）。
+- `active` のような別のフラグは無い。終わらせるとは `until` を過去にすること。他のキーは情報用で、判定に影響しない。
+
+### 夜間モード中に止めるもの（終了コード 2、理由は日本語で stderr）
+
+- Bash:
+  - `git push`、`git send-email`（`git -C x push`・`g"it" push`・`\git push`・`sudo`/`env` 越し・`sh -c`/`eval` の中・`&&` `;` `|` `$( )` の後ろも含む）。
+  - `gh` は既定で止める。通すのは読み取りだけ: `pr view|list|status|diff|checks`、`issue view|list|status`、`run view|list|watch`、`workflow view|list`、`release view|list|download`、`repo view|clone`、`auth status`、`search`、`api`（GET のみで、`-f/-F/--field/--raw-field/--input` なし）。
+  - 文字列に `night-mode` を含むコマンド、`workops ... night start|end`、`.claude/settings.json`・`.claude/settings.local.json`・`.claude/hooks/` に触れるコマンド（安全装置を外から外させないため）。
+  - ローカルの git（commit・add・branch・checkout・switch・status・log・diff・worktree）、テスト、ビルド、読み取りは通す。
+- Edit / Write / MultiEdit / NotebookEdit: 対象がマーカー、`.claude/settings.json`、`.claude/settings.local.json`、`~/.claude/hooks/` 配下のとき。パスは `~` 展開・相対パス解決・シンボリックリンク解決のあとで比べる。
+- MCP（`mcp__*`）: コネクタの名前空間は UUID で変わるため、最後の `__` より後ろの道具名で見る。
+  - ローカルのサーバ（`unityMCP*`・`ccd_*`・`visualize`・`Claude_Code_iOS_Simulator`・`scheduled-tasks`）は通す。ただし `ccd_session` の `move_to_cloud` と、`target` が `cloud`/`ssh` の `start_session`、`ccd_pr` の `set_auto_merge` は止める。
+  - それ以外は、道具名が読み取りの動詞（get・list・read・search・fetch・query・view・find・retrieve・download・whoami・describe）で始まるときだけ通す。先頭が `slack`・`notion`・`api`・`gmail`・`calendar`・`drive`・`browser` のときは、2語目で見る。`API-post-search` だけは名前に post を含むが検索なので明示的に通す。
+  - 読み取りの動詞で始まっても、名前に書き込みの動詞（create・update・delete・send・post など）を1つでも含めば止める（例: `get_or_create`）。
+  - 上記以外の MCP は止める（既定で拒否）。
+- Read・Grep・Glob・Agent など、その他のツールは通す。
+
+### 置き場所
+
+- claude-core に置く。claude-core は `~/.claude` へ入り、全セッションに効く層だから。
+- claude-engineering は `--project` でプロジェクトごとにしか入らないので、「全セッション」の層になれない。
+
+### 例外時の扱い（ADR-006 との違い）
+
+- ADR-006 は、hook 自身の予期しない例外は exit 0（通す）と決めている。この hook は、**マーカーがある間に限り**逆にする。判定コードが例外を出したら、標準入力が壊れていたら、ブロックする（exit 2）。
+- 理由: 夜間モードは「外に見える操作を絶対にしない」ための安全装置で、壊れて通すと、止めたかった操作が黙って通る。マーカーが無いとき（ふだんの昼）は従来どおり、何も起きずに通る。ふだんの開発を hook のバグで止めないというADR-006 の狙いはそのまま守られる。
+
+### 人間の解除方法
+
+- マーカーを、人間が自分のターミナルで削除する。または人間が `workops night end` を実行する。
+- エージェントからは、マーカーの編集・削除、`workops night` の実行、設定ファイルと hook の編集ができない（上記のとおり止まる）。
+- 何もしなくても、`until` を過ぎれば自動で解除される。
+
+## 検討した選択肢
+
+- **A. リポジトリごとの設定で止める** — 却下。DWAI の各リポジトリは他の人と共有しているため、リポジトリごとに設定を足す必要があり、置き忘れた場所では効かない。
+- **B. claude-engineering に置く** — 却下。プロジェクトごとにしか入らず、全セッションの層ではない。
+- **C. push と PR だけ止める** — 却下。Slack・Notion・Gmail・Calendar・Drive への書き込みは外に見えるのに、開いたままになる。
+- **D. 全セッション層の hook で、外に見える操作をまとめて止める（採用）**。
+
+## 結果
+
+### Positive
+
+- 夜は、push・PR・外への書き込みが、指示に頼らず物理的に止まる。
+- マーカーが無いときの追加コストは、Python の起動時間にほぼ収まる（20 回の平均で、素の `python3 -c pass` と差が測れなかった）。
+
+### Negative / 限界
+
+- コマンド文字列を見る検査であり、網は意図的に不完全（ADR-028）。例: `curl` での webhook への POST、インタプリタの中に隠した処理（`python3 -c` 内の push などは単純な文字列の近似でしか見ない）、git の alias、別名にした `gh` は止められない。
+- MCP の判定は、道具名の動詞による見立てで、確実ではない。読み取りに見える名前で書き込む道具、書き込みに見える名前の読み取り道具があると外れる。新しいコネクタは、夜は読み取りだけが通る側に倒れる（通らなければ昼にやる）。
+- 夜間モード中は、Notion の記録や Slack の連絡も止まる。夜の作業の報告は、ローカルの作業ブランチとログに残し、朝に人間が出す。
+
+### 運用上の影響
+
+- `settings-fragment.json` に PreToolUse の項目を1つ足す。反映には `python3 install.py`（update）の再実行が必要（ADR-023）。配線は ADR-031 の所有 hook の入れ替えで他ツールの項目を残したまま入る。
+- ヘルパは `hooks/_night_mode_policy.py`（マーカーの判定・ファイル・MCP）と `hooks/_night_mode_bash.py`（Bash）。
