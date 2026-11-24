@@ -92,6 +92,12 @@ GH_DENY_UNLESS_READ = [
     "subprocess.run(['gh','pr','create'])", "x gh -R o/r pr create",
 ]
 
+GH_SECOND_NET_BLOCKED = [
+    "x gh pr view 3; echo pr create", "x gh pr view 3 && echo issue comment 3", "x gh api repos/o/r; curl -X POST u",
+    "x gh run list | echo release upload", "x gh auth status; echo repo fork", "gh pr view 3 ; workflow run",
+    "gh pr list --json number; echo '-f a=b' api",
+]
+
 GH_READ_ALLOWED = [
     "x gh pr view 3", "x gh pr list", "x gh issue view 3", "x gh run watch 5", "x gh -R o/r pr view 3", "x gh api repos/o/r",
     "x gh api -X GET repos/o/r", "x gh search issues foo", "x gh release download v1", "x gh repo view", "x gh auth status",
@@ -183,12 +189,20 @@ class BashTables(unittest.TestCase):
         self.check(GH_DENY_UNLESS_READ, True)
         self.check(GH_READ_ALLOWED, False)
 
+    def test_gh_second_net_still_blocks(self):
+        self.check(GH_SECOND_NET_BLOCKED, True)
+
     def test_git_config_single_operand_is_read(self):
         self.check(["git config user.name", "git config --global user.name", "git config --local core.editor",
-                    "git config --show-origin user.email"], False)
+                    "git config --show-origin user.email", "git config list", "git config --global list",
+                    "git config get user.name", "git config get --global user.name", "git config remote.origin.url"], False)
         self.check(["git config user.name x", "git config --unset user.name", "git config --unset-all x",
                     "git config --add a b", "git config --edit", "git config -e", "git config --replace-all a b",
-                    "git config --global --remove-section x", "git config --uns user.name", "git config"], True)
+                    "git config --global --remove-section x", "git config --uns user.name", "git config",
+                    "git config edit", "git config set a.b c", "git config unset a.b", "git config rename-section a b",
+                    "git config remove-section a", "git config get", "git config get a.b c", "git config list x",
+                    "git config get-color x", "git config get-colorbool x", "git config username", "git config get username",
+                    "git config get list", "git config list list", "git config --global edit"], True)
 
     def test_catch_all_allowed(self):
         self.check(CATCH_ALL_ALLOWED, False)
