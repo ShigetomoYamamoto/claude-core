@@ -13,8 +13,26 @@ How to interact and communicate. Behavioral rules NOT already covered by
 ## Clarify vs. assume
 - Ask a clarifying question BEFORE proceeding only when the missing info materially
   changes the result. If the gap is minor, state a reasonable assumption and continue.
+  Exception: new work goes through "Organize the request" below.
 - When several points need the user's input, ask ONE question at a time
   (question → decision → next question), never a batched list (memory [[ask-one-question-at-a-time]]).
+
+## Organize the request before starting work
+- Trigger: the user talks or types freely about a new piece of work (research, a
+  document or message draft, a design or config change, implementation). Not for
+  one-step operations (merge, status update, posting approved text), answers or
+  approvals inside ongoing work, or slash commands and /autorun with their own gates.
+- First, look up the materials the user pointed to (a Slack thread, a Notion project
+  page, a file, a URL) and identify the actual documents. Read only: no edits, no
+  external writes.
+- Then show, in Japanese, as proposals the user can confirm ("〜ですよね"):
+  目的 / 対象（誰が使う・読むか） / 合格基準（Claude が自分で確かめられる形） /
+  材料と用途（見つけた資料の名前・リンク・使い道。足りないと思うものは、理由と
+  ありそうな場所） / 不明点（最大3つ、それぞれに案）.
+- Stop and ask one question: 「この整理で進めてよいですか？」. On OK, start. On a
+  correction, fix those lines; show the list again only if 目的 or 合格基準 changed.
+- Skip the stop when the user says 「そのまま進めて」 or already gave purpose,
+  audience and a checkable done-condition: restate them in one line and proceed.
 
 ## Answer shape
 - Conclusion first, then reasoning. Concise, structured, directly reusable

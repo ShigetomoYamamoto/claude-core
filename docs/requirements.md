@@ -48,7 +48,6 @@ engineering / work-agent はこの土台の上に、それぞれのドメイン�
 
 | skill | 内容 |
 |---|---|
-| `3-line-contract` | 着手前の3行タスク整形（中立） |
 | `memory-dream` | ナレッジベース棚卸し（中立） |
 
 ### D. copy 型インストーラとマルチマシン同期
